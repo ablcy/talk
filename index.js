@@ -113,22 +113,34 @@ if (DATABASE_URL) {
 async function initDB() {
   if (DATABASE_URL) {
     try {
+      console.log('Initializing PostgreSQL database...');
+
       await usersDB.query(`
         CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY,
           username TEXT UNIQUE NOT NULL,
           password TEXT NOT NULL,
           avatar TEXT,
+          nickname TEXT DEFAULT '',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
+      console.log('Users table created/verified');
 
-      // 添加avatar列（如果不存在）
+      // 确保 nickname 列存在
+      try {
+        await usersDB.query('ALTER TABLE users ADD COLUMN nickname TEXT DEFAULT \'\'');
+        console.log('Added nickname column to users table');
+      } catch (e) {
+        console.log('Nickname column already exists');
+      }
+
+      // 确保 avatar 列存在
       try {
         await usersDB.query('ALTER TABLE users ADD COLUMN avatar TEXT');
-        await usersDB.query('ALTER TABLE users ADD COLUMN nickname TEXT');
+        console.log('Added avatar column to users table');
       } catch (e) {
-        // 列已存在，忽略错误
+        console.log('Avatar column already exists');
       }
 
       await friendshipsDB.query(`
@@ -139,6 +151,7 @@ async function initDB() {
           UNIQUE(user_id, friend_id)
         )
       `);
+      console.log('Friendships table created/verified');
 
       await messagesDB.query(`
         CREATE TABLE IF NOT EXISTS messages (
@@ -152,25 +165,29 @@ async function initDB() {
           read BOOLEAN DEFAULT FALSE
         )
       `);
+      console.log('Messages table created/verified');
 
       // 添加type列（如果不存在）
       try {
         await messagesDB.query('ALTER TABLE messages ADD COLUMN type TEXT DEFAULT \'text\'');
+        console.log('Added type column to messages table');
       } catch (e) {
-        // 列已存在，忽略错误
+        console.log('Type column already exists in messages');
       }
 
       await messagesDB.query(`
         CREATE INDEX IF NOT EXISTS idx_messages_sender_receiver ON messages(sender_id, receiver_id)
       `);
+      console.log('Created messages index');
 
       await friendshipsDB.query(`
         CREATE INDEX IF NOT EXISTS idx_friendships_user_id ON friendships(user_id)
       `);
+      console.log('Created friendships index');
 
       console.log('PostgreSQL database initialized successfully');
     } catch (error) {
-      console.error('Database initialization error:', error);
+      console.error('Database initialization error:', error.message || error);
     }
   } else {
     require('fs').mkdirSync('./data', { recursive: true });
