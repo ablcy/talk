@@ -194,6 +194,8 @@ function promisifyDB(method) {
 app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
 
+  console.log('Register attempt:', { username, hasPassword: !!password });
+
   if (!username || !password) {
     return res.status(400).json({ success: false, message: '用户名和密码不能为空' });
   }
@@ -205,7 +207,9 @@ app.post('/api/register', async (req, res) => {
   try {
     let existing;
     if (DATABASE_URL) {
+      console.log('Checking existing user in PostgreSQL...');
       existing = await usersDB.query('SELECT id FROM users WHERE username = $1', [username]);
+      console.log('Existing check result:', existing.rows.length);
     } else {
       existing = await promisifyDB(usersDB.find).call(usersDB, { username });
     }
@@ -217,11 +221,14 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     const userId = uuidv4();
 
+    console.log('Creating new user:', { userId, username });
+
     if (DATABASE_URL) {
       await usersDB.query(
         'INSERT INTO users (id, username, password, avatar, nickname) VALUES ($1, $2, $3, $4, $5)',
         [userId, username, hashedPassword, null, '']
       );
+      console.log('User inserted into PostgreSQL');
     } else {
       await promisifyDB(usersDB.insert).call(usersDB, {
         _id: userId,
@@ -238,8 +245,8 @@ app.post('/api/register', async (req, res) => {
 
     res.json({ success: true, user: { id: userId, username, avatar: null, nickname: '' } });
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ success: false, message: '注册失败' });
+    console.error('Register error:', error.message || error);
+    res.status(500).json({ success: false, message: '注册失败: ' + (error.message || '未知错误') });
   }
 });
 
@@ -906,9 +913,20 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Talk server running on port ${PORT}`);
-  console.log(DATABASE_URL ? 'Using PostgreSQL' : 'Using NeDB for development');
+async function startServer() {
+  await initDB();
+  app.listen(PORT, () => {
+    console.log(`Tell server running on port ${PORT}`);
+    console.log(DATABASE_URL ? 'Using PostgreSQL' : 'Using NeDB for development');
+    if (DATABASE_URL) {
+      console.log('Database URL configured, tables should be initialized');
+    }
+  });
+}
+
+startServer().catch(error => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });
 
 module.exports = app;
