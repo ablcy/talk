@@ -73,7 +73,6 @@ class ChatApp {
 
     showCreateGroupModal() {
         document.getElementById('create-group-modal').style.display = 'flex';
-        document.getElementById('group-name-input').value = '';
         document.getElementById('group-number-input').value = '';
     }
 
@@ -313,9 +312,14 @@ class ChatApp {
                         avatar: result.imageUrl
                     })
                 });
-                if (updateResult.success) {
-                    // 更新本地currentGroup
-                    this.currentGroup.avatar = result.imageUrl;
+                if (updateResult.success && updateResult.group) {
+                    // 使用后端返回的完整群信息更新
+                    this.currentGroup = updateResult.group;
+                    // 同时更新groups数组中的群
+                    const groupIndex = this.groups.findIndex(g => g.id === this.currentGroup.id);
+                    if (groupIndex !== -1) {
+                        this.groups[groupIndex] = this.currentGroup;
+                    }
                     // 更新群聊头像显示
                     this.renderChatList();
                     // 更新群设置弹窗中的头像
@@ -351,9 +355,14 @@ class ChatApp {
             })
         });
 
-        if (result.success) {
-            // 更新本地currentGroup
-            this.currentGroup.group_number = groupAccount;
+        if (result.success && result.group) {
+            // 使用后端返回的完整群信息更新
+            this.currentGroup = result.group;
+            // 同时更新groups数组中的群
+            const groupIndex = this.groups.findIndex(g => g.id === this.currentGroup.id);
+            if (groupIndex !== -1) {
+                this.groups[groupIndex] = this.currentGroup;
+            }
             this.renderChatList();
             alert('群账号更新成功');
         } else {
@@ -534,11 +543,14 @@ class ChatApp {
         const storedUser = localStorage.getItem('currentUser');
         if (storedUser) {
             this.currentUser = JSON.parse(storedUser);
-            await this.loadFriends();
-            await this.loadGroups();
-            this.loadMessages();
-            this.showMainScreen();
-            this.startPolling();
+            this.showMainScreen(); // 先显示界面
+            
+            // 并行加载好友和群聊
+            Promise.all([this.loadFriends(), this.loadGroups()]).then(() => {
+                this.renderChatList(); // 加载完立即渲染
+                this.loadMessages();
+                this.startPolling();
+            });
         }
     }
 
@@ -630,18 +642,6 @@ class ChatApp {
         } else {
             btn.textContent = btn.dataset.originalText || originalText;
             btn.classList.remove('loading-btn');
-        }
-    }
-
-    loadUserData() {
-        const storedUser = localStorage.getItem('currentUser');
-        if (storedUser) {
-            this.currentUser = JSON.parse(storedUser);
-            this.loadFriends().then(() => {
-                this.loadMessages();
-                this.showMainScreen();
-                this.startPolling();
-            });
         }
     }
 
@@ -1619,7 +1619,7 @@ class ChatApp {
         // 更新日志
         const updateTitle = document.querySelector('#update-header h3');
         if (updateTitle) {
-            updateTitle.textContent = t.updateLog + ' v4.4.1';
+            updateTitle.textContent = t.updateLog + ' v4.4.2';
         }
 
         // 个人页
@@ -1652,11 +1652,11 @@ class ChatApp {
         }
 
         // 页脚
-        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.4.1';
+        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.4.2';
         document.querySelector('.copyright').textContent = t.copyright;
 
         // 版本信息
-        document.querySelector('.version-info span:first-child').textContent = 'v4.4.1';
+        document.querySelector('.version-info span:first-child').textContent = 'v4.4.2';
 
         // 聊天输入框
         document.getElementById('message-input').placeholder = this.currentLang === 'zh' ? '输入消息...' : 'Type a message...';

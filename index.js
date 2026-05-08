@@ -1206,38 +1206,44 @@ app.put('/api/group/:groupId', async (req, res) => {
     }
 
     // 更新群信息
-    const updateFields = [];
-    const updateValues = [];
-    let paramIndex = 1;
-
-    if (groupNumber) {
-      updateFields.push(`group_number = $${paramIndex++}`);
-      updateValues.push(groupNumber);
-    }
-    if (avatar !== undefined) { // 允许设置为空字符串
-      updateFields.push(`avatar = $${paramIndex++}`);
-      updateValues.push(avatar);
-    }
-
-    if (updateFields.length === 0) {
-      return res.status(400).json({ success: false, message: '没有要更新的内容' });
-    }
-
-    updateValues.push(groupId);
-
     if (DATABASE_URL) {
+      const updateFields = [];
+      const updateValues = [];
+      let paramIndex = 1;
+
+      if (groupNumber) {
+        updateFields.push(`group_number = $${paramIndex++}`);
+        updateValues.push(groupNumber);
+      }
+      if (avatar !== undefined) { // 允许设置为空字符串
+        updateFields.push(`avatar = $${paramIndex++}`);
+        updateValues.push(avatar);
+      }
+
+      if (updateFields.length === 0) {
+        return res.status(400).json({ success: false, message: '没有要更新的内容' });
+      }
+
+      updateValues.push(groupId);
+
       await groupsDB.query(
         `UPDATE "groups" SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
         updateValues
       );
+
+      // 获取更新后的群信息
+      const result = await groupsDB.query('SELECT id, group_number, name, avatar, owner_id FROM "groups" WHERE id = $1', [groupId]);
+      res.json({ success: true, message: '更新成功', group: result.rows[0] });
     } else {
       const updateData = {};
       if (groupNumber) updateData.group_number = groupNumber;
       if (avatar !== undefined) updateData.avatar = avatar;
       await promisifyDB(groupsDB.update).call(groupsDB, { id: groupId }, { $set: updateData });
-    }
 
-    res.json({ success: true, message: '更新成功' });
+      // 获取更新后的群信息
+      const groups = await promisifyDB(groupsDB.find).call(groupsDB, { id: groupId });
+      res.json({ success: true, message: '更新成功', group: groups[0] });
+    }
   } catch (error) {
     console.error('Update group error:', error);
     res.status(500).json({ success: false, message: '更新群信息失败' });
