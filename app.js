@@ -288,36 +288,34 @@ class ChatApp {
         if (!file) return;
 
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('avatar', file);
+        formData.append('groupId', this.currentGroup.id);
 
         try {
-            const response = await fetch('/api/upload-image', {
+            const response = await fetch(`${this.baseUrl}/api/upload-group-avatar`, {
                 method: 'POST',
                 body: formData
             });
             const result = await response.json();
+
             if (result.success) {
-                // 上传头像成功，更新群
+                // 更新群信息
                 const updateResult = await this.fetchData(`/api/group/${this.currentGroup.id}`, {
                     method: 'PUT',
                     body: JSON.stringify({
                         userId: this.currentUser.id,
-                        avatar: this.baseUrl + result.url
+                        avatar: result.avatar
                     })
                 });
                 if (updateResult.success && updateResult.group) {
-                    // 使用后端返回的完整群信息更新
                     this.currentGroup = updateResult.group;
-                    // 同时更新groups数组中的群
                     const groupIndex = this.groups.findIndex(g => g.id === this.currentGroup.id);
                     if (groupIndex !== -1) {
                         this.groups[groupIndex] = this.currentGroup;
                     }
-                    // 更新群聊头像显示
                     this.renderChatList();
-                    // 更新群设置弹窗中的头像
                     const avatarPreview = document.getElementById('group-avatar-preview');
-                    avatarPreview.innerHTML = `<img src="${this.baseUrl + result.url}" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+                    avatarPreview.innerHTML = `<img src="${result.avatar}" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
                     alert('群头像更新成功');
                 } else {
                     alert(updateResult.message || '更新失败');
@@ -1620,7 +1618,7 @@ class ChatApp {
         // 更新日志
         const updateTitle = document.querySelector('#update-header h3');
         if (updateTitle) {
-            updateTitle.textContent = t.updateLog + ' v4.4.12';
+            updateTitle.textContent = t.updateLog + ' v4.4.13';
         }
 
         // 个人页
@@ -1653,11 +1651,11 @@ class ChatApp {
         }
 
         // 页脚
-        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.4.12';
+        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.4.13';
         document.querySelector('.copyright').textContent = t.copyright;
 
         // 版本信息
-        document.querySelector('.version-info span:first-child').textContent = 'v4.4.12';
+        document.querySelector('.version-info span:first-child').textContent = 'v4.4.13';
 
         // 聊天输入框
         document.getElementById('message-input').placeholder = this.currentLang === 'zh' ? '输入消息...' : 'Type a message...';

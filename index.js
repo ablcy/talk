@@ -807,6 +807,38 @@ app.delete('/api/admin/users/:userId', adminAuthMiddleware, async (req, res) => 
   }
 });
 
+// 上传群头像API
+app.post('/api/upload-group-avatar', upload.single('avatar'), async (req, res) => {
+  try {
+    const { groupId } = req.body;
+
+    if (!groupId || !req.file) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+
+    const filePath = path.join(uploadsDir, req.file.filename);
+    const fileBuffer = fs.readFileSync(filePath);
+    const base64Image = `data:${req.file.mimetype};base64,${fileBuffer.toString('base64')}`;
+    
+    fs.unlinkSync(filePath);
+
+    if (DATABASE_URL) {
+      await groupsDB.query('UPDATE "groups" SET avatar = $1 WHERE id = $2', [base64Image, groupId]);
+    } else {
+      await promisifyDB(groupsDB.update).call(groupsDB,
+        { id: groupId },
+        { $set: { avatar: base64Image } },
+        { multi: false }
+      );
+    }
+
+    res.json({ success: true, avatar: base64Image });
+  } catch (error) {
+    console.error('Upload group avatar error:', error);
+    res.status(500).json({ success: false, message: '上传失败' });
+  }
+});
+
 // 上传头像API
 app.post('/api/upload-avatar', upload.single('avatar'), async (req, res) => {
   try {
