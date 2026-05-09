@@ -418,12 +418,14 @@ form button[type="submit"]:hover {
     border-bottom: 1px solid var(--border-color);
 }
 
-.chat-header #back-btn {
+.chat-header #back-btn,
+.chat-header #group-back-btn {
     font-size: 2rem;
     color: var(--text-primary);
 }
 
-.chat-header #chat-friend-name {
+.chat-header #chat-friend-name,
+.chat-header #group-chat-name {
     flex: 1;
     font-size: 1.1rem;
     font-weight: 600;
@@ -480,7 +482,8 @@ form button[type="submit"]:hover {
     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.message-input-area #message-input {
+.message-input-area #message-input,
+.message-input-area #group-message-input {
     flex: 1;
     padding: 12px 18px;
     border: 1px solid var(--border-color);
@@ -490,7 +493,8 @@ form button[type="submit"]:hover {
     min-height: 44px;
 }
 
-.message-input-area #message-input:focus {
+.message-input-area #message-input:focus,
+.message-input-area #group-message-input:focus {
     outline: none;
     border-color: var(--talk-blue);
     background: var(--white);
