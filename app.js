@@ -710,7 +710,8 @@ class ChatApp {
         if (result.success) {
             this.currentUser = result.user;
             localStorage.setItem('currentUser', JSON.stringify(result.user));
-            await this.loadFriends();
+            await Promise.all([this.loadFriends(), this.loadGroups()]);
+            this.renderChatList();
             this.loadMessages();
             this.showMainScreen();
             this.startPolling();
@@ -1618,7 +1619,7 @@ class ChatApp {
         // 更新日志
         const updateTitle = document.querySelector('#update-header h3');
         if (updateTitle) {
-            updateTitle.textContent = t.updateLog + ' v4.4.13';
+            updateTitle.textContent = t.updateLog + ' v4.4.14';
         }
 
         // 个人页
@@ -1651,11 +1652,11 @@ class ChatApp {
         }
 
         // 页脚
-        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.4.13';
+        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.4.14';
         document.querySelector('.copyright').textContent = t.copyright;
 
         // 版本信息
-        document.querySelector('.version-info span:first-child').textContent = 'v4.4.13';
+        document.querySelector('.version-info span:first-child').textContent = 'v4.4.14';
 
         // 聊天输入框
         document.getElementById('message-input').placeholder = this.currentLang === 'zh' ? '输入消息...' : 'Type a message...';
