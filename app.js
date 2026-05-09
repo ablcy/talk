@@ -298,7 +298,7 @@ class ChatApp {
         formData.append('image', file);
 
         try {
-            const response = await fetch('/api/upload', {
+            const response = await fetch('/api/upload-image', {
                 method: 'POST',
                 body: formData
             });
@@ -309,7 +309,7 @@ class ChatApp {
                     method: 'PUT',
                     body: JSON.stringify({
                         userId: this.currentUser.id,
-                        avatar: result.imageUrl
+                        avatar: this.baseUrl + result.url
                     })
                 });
                 if (updateResult.success && updateResult.group) {
