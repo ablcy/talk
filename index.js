@@ -1343,27 +1343,49 @@ app.get('/api/group/:groupId/messages', async (req, res) => {
     let msgs;
     if (DATABASE_URL) {
       msgs = await groupMessagesDB.query(
-        `SELECT id, group_id, sender_id, content, type, time, timestamp
-         FROM group_messages WHERE group_id = $1 ORDER BY timestamp ASC`,
+        `SELECT gm.id, gm.group_id, gm.sender_id, gm.content, gm.type, gm.time, gm.timestamp,
+                u.username, u.avatar
+         FROM group_messages gm
+         LEFT JOIN users u ON gm.sender_id = u.id
+         WHERE gm.group_id = $1 ORDER BY gm.timestamp ASC`,
         [groupId]
       );
     } else {
       msgs = await promisifyDB(groupMessagesDB.find).call(groupMessagesDB, { group_id: groupId });
       msgs = msgs.sort((a, b) => a.timestamp - b.timestamp);
+
+      const userIds = [...new Set(msgs.map(m => m.sender_id || m.senderId))];
+      let usersData = [];
+      if (userIds.length > 0) {
+        const users = await promisifyDB(usersDB.find).call(usersDB, { id: { $in: userIds } });
+        usersData = users;
+      }
+
+      msgs = msgs.map(msg => {
+        const senderId = msg.sender_id || msg.senderId;
+        const sender = usersData.find(u => u.id === senderId);
+        return {
+          ...msg,
+          senderId: senderId,
+          username: sender?.username || 'Unknown',
+          avatar: sender?.avatar || ''
+        };
+      });
+
+      return res.json({ success: true, messages: msgs });
     }
 
-    const messages = (DATABASE_URL ? msgs.rows : msgs).map(msg => {
-      const senderId = DATABASE_URL ? msg.sender_id : msg.senderId;
-      return {
-        id: msg.id,
-        groupId: msg.group_id || msg.groupId,
-        senderId: senderId,
-        content: msg.content,
-        type: msg.type || 'text',
-        time: msg.time,
-        timestamp: msg.timestamp
-      };
-    });
+    const messages = msgs.rows.map(msg => ({
+      id: msg.id,
+      groupId: msg.group_id,
+      senderId: msg.sender_id,
+      content: msg.content,
+      type: msg.type || 'text',
+      time: msg.time,
+      timestamp: msg.timestamp,
+      username: msg.username || 'Unknown',
+      avatar: msg.avatar || ''
+    }));
 
     res.json({ success: true, messages });
   } catch (error) {

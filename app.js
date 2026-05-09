@@ -117,14 +117,19 @@ class ChatApp {
         document.getElementById('group-chat-view').style.display = 'flex';
         document.getElementById('group-chat-name').textContent = group.name;
 
-        // 加载群成员信息
+        // 立即显示预加载的消息
+        this.renderGroupMessages();
+
+        // 后台静默加载群成员和最新消息
         const membersResult = await this.fetchData(`/api/group/${groupId}/members`);
         if (membersResult.success) {
             this.currentGroupMembers = membersResult.members;
         }
 
-        await this.loadGroupMessages(groupId);
-        this.renderGroupMessages();
+        // 静默更新消息（在后台更新）
+        this.loadGroupMessages(groupId).then(() => {
+            this.renderGroupMessages();
+        });
     }
 
     async loadGroupMessages(groupId) {
@@ -155,40 +160,28 @@ class ChatApp {
 
         container.innerHTML = messages.map(msg => {
             const isMine = msg.senderId === this.currentUser.id;
-            
-            // 获取发送者信息
+
             let sender = null;
             if (isMine) {
                 sender = this.currentUser;
+            } else if (msg.username) {
+                sender = {
+                    username: msg.username,
+                    avatar: msg.avatar || ''
+                };
             } else if (this.currentGroupMembers) {
                 sender = this.currentGroupMembers.find(m => m.id === msg.senderId);
             }
-            
-            // 如果找不到，尝试从 msg.senderName 中获取
-            if (!sender && msg.senderName) {
-                sender = {
-                    username: msg.senderName,
-                    avatar: ''
-                };
-            }
 
             let avatarContent = '';
-            if (sender) {
-                if (sender.avatar && sender.avatar.trim() !== '') {
-                    // 有头像时显示图片
-                    avatarContent = `<div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; flex-shrink: 0;">
-                        <img src="${sender.avatar}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
-                    </div>`;
-                } else {
-                    // 没有头像时显示首字母
-                    avatarContent = `<div style="width: 40px; height: 40px; border-radius: 50%; background: var(--talk-blue); color: white; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; flex-shrink: 0;">
-                        ${sender.username ? sender.username.charAt(0).toUpperCase() : 'U'}
-                    </div>`;
-                }
+            const avatarUrl = sender?.avatar?.trim() || '';
+            if (avatarUrl) {
+                avatarContent = `<div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; flex-shrink: 0;">
+                    <img src="${avatarUrl}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>`;
             } else {
-                // 默认头像
                 avatarContent = `<div style="width: 40px; height: 40px; border-radius: 50%; background: var(--talk-blue); color: white; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; flex-shrink: 0;">
-                    U
+                    ${sender?.username?.charAt(0).toUpperCase() || 'U'}
                 </div>`;
             }
 
@@ -980,6 +973,13 @@ class ChatApp {
             }
         }
 
+        for (const group of this.groups) {
+            const result = await this.fetchData(`/api/group/${group.id}/messages`);
+            if (result.success) {
+                this.groupMessages[group.id] = result.messages;
+            }
+        }
+
         for (const friend of this.friends) {
             const oldCount = (oldMessages[friend.id] || []).length;
             const newCount = (this.messages[friend.id] || []).length;
@@ -1619,7 +1619,7 @@ class ChatApp {
         // 更新日志
         const updateTitle = document.querySelector('#update-header h3');
         if (updateTitle) {
-            updateTitle.textContent = t.updateLog + ' v4.4.4';
+            updateTitle.textContent = t.updateLog + ' v4.4.5';
         }
 
         // 个人页
@@ -1652,11 +1652,11 @@ class ChatApp {
         }
 
         // 页脚
-        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.4.4';
+        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.4.5';
         document.querySelector('.copyright').textContent = t.copyright;
 
         // 版本信息
-        document.querySelector('.version-info span:first-child').textContent = 'v4.4.4';
+        document.querySelector('.version-info span:first-child').textContent = 'v4.4.5';
 
         // 聊天输入框
         document.getElementById('message-input').placeholder = this.currentLang === 'zh' ? '输入消息...' : 'Type a message...';
