@@ -225,17 +225,6 @@ class ChatApp {
         this.saveBurnAfterReadingSetting(this.burnAfterReadingEnabled);
     }
 
-    closeChatView() {
-        if (this.burnAfterReadingEnabled === this.currentFriend.id) {
-            const container = document.getElementById('messages-container');
-            container.innerHTML = '<div class="empty-chat"><p>开始聊天吧！</p></div>';
-            delete this.messages[this.currentFriend.id];
-        }
-        document.getElementById('chat-view').style.display = 'none';
-        this.currentFriend = null;
-        this.renderChatList();
-    }
-
     renderGroupMessages() {
         const container = document.getElementById('group-messages-container');
         if (!this.currentGroup) {
@@ -1297,6 +1286,12 @@ class ChatApp {
     }
 
     closeChatView() {
+        const shouldBurn = this.currentFriend && this.burnAfterReadingEnabled === this.currentFriend.id;
+        if (shouldBurn) {
+            const container = document.getElementById('messages-container');
+            container.innerHTML = '<div class="empty-chat"><p>开始聊天吧！</p></div>';
+            delete this.messages[this.currentFriend.id];
+        }
         document.getElementById('chat-view').style.display = 'none';
         this.currentFriend = null;
         this.renderChatList();
@@ -1910,7 +1905,7 @@ class ChatApp {
         // 更新日志
         const updateTitle = document.querySelector('#update-header h3');
         if (updateTitle) {
-            updateTitle.textContent = t.updateLog + ' v4.5.5';
+            updateTitle.textContent = t.updateLog + ' v4.5.6';
         }
 
         // 个人页

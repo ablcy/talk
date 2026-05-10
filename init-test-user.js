@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const DATABASE_URL = 'postgresql://xata:xIpmyAjz9I0Hb3rWE6m2MYDyUMCmc9hY2rnPgfoi6eejjwGlN9KuXrLfVmbHnsG2@ma8pq7vand7rv3dvpeaa1kdbog.us-east-1.xata.tech/xata?sslmode=require';
 
-console.log('🚀 Initializing database and creating test user...');
+console.log('🚀 Initializing database and creating test users...');
 
 async function main() {
     if (!DATABASE_URL) {
@@ -106,45 +106,109 @@ async function main() {
         `);
         console.log('✅ Group messages table created');
         
-        // 创建测试账户
-        console.log('👤 Creating test user...');
+        // 创建测试账户1
+        console.log('👤 Creating test user 1...');
         
-        const testUser = {
+        const testUser1 = {
             id: uuidv4(),
-            username: 'testuser',
+            username: 'test1',
             password: await bcrypt.hash('123456', 10),
             avatar: null,
-            nickname: '测试用户'
+            nickname: '测试用户1'
         };
         
         try {
             await client.query(
                 'INSERT INTO users (id, username, password, avatar, nickname) VALUES ($1, $2, $3, $4, $5)',
-                [testUser.id, testUser.username, testUser.password, testUser.avatar, testUser.nickname]
+                [testUser1.id, testUser1.username, testUser1.password, testUser1.avatar, testUser1.nickname]
             );
-            console.log('✅ Test user created successfully!');
+            console.log('✅ Test user 1 created successfully!');
         } catch (e) {
-            if (e.code === '23505') { // 唯一约束违反
-                console.log('ℹ️  Test user already exists');
+            if (e.code === '23505') {
+                console.log('ℹ️  Test user 1 already exists');
             } else {
                 throw e;
             }
         }
         
-        // 验证用户
-        const result = await client.query('SELECT id, username, nickname FROM users WHERE username = $1', ['testuser']);
-        if (result.rows.length > 0) {
-            console.log('');
-            console.log('🎉 数据库初始化成功！');
-            console.log('');
-            console.log('📋 测试账户信息：');
-            console.log('   👤 用户名：testuser');
-            console.log('   🔑 密码：123456');
-            console.log('   📝 昵称：测试用户');
-            console.log('   🆔 ID：', result.rows[0].id);
-            console.log('');
-            console.log('现在你可以用这个账户登录网站了！');
+        // 创建测试账户2
+        console.log('👤 Creating test user 2...');
+        
+        const testUser2 = {
+            id: uuidv4(),
+            username: 'test2',
+            password: await bcrypt.hash('123456', 10),
+            avatar: null,
+            nickname: '测试用户2'
+        };
+        
+        try {
+            await client.query(
+                'INSERT INTO users (id, username, password, avatar, nickname) VALUES ($1, $2, $3, $4, $5)',
+                [testUser2.id, testUser2.username, testUser2.password, testUser2.avatar, testUser2.nickname]
+            );
+            console.log('✅ Test user 2 created successfully!');
+        } catch (e) {
+            if (e.code === '23505') {
+                console.log('ℹ️  Test user 2 already exists');
+            } else {
+                throw e;
+            }
         }
+        
+        // 查询用户ID
+        const result1 = await client.query('SELECT id, username, nickname FROM users WHERE username = $1', ['test1']);
+        const result2 = await client.query('SELECT id, username, nickname FROM users WHERE username = $1', ['test2']);
+        
+        const user1Id = result1.rows[0]?.id;
+        const user2Id = result2.rows[0]?.id;
+        
+        // 建立好友关系
+        if (user1Id && user2Id) {
+            console.log('🤝 Creating friendship between test users...');
+            try {
+                await client.query(
+                    'INSERT INTO friendships (user_id, friend_id) VALUES ($1, $2)',
+                    [user1Id, user2Id]
+                );
+                await client.query(
+                    'INSERT INTO friendships (user_id, friend_id) VALUES ($1, $2)',
+                    [user2Id, user1Id]
+                );
+                console.log('✅ Friendship created successfully!');
+            } catch (e) {
+                if (e.code === '23505') {
+                    console.log('ℹ️  Friendship already exists');
+                } else {
+                    throw e;
+                }
+            }
+        }
+        
+        console.log('');
+        console.log('🎉 数据库初始化成功！');
+        console.log('');
+        console.log('📋 测试账户信息：');
+        console.log('');
+        console.log('用户1：');
+        console.log('   👤 用户名：test1');
+        console.log('   🔑 密码：123456');
+        console.log('   📝 昵称：测试用户1');
+        console.log('   🆔 ID：', user1Id);
+        console.log('');
+        console.log('用户2：');
+        console.log('   👤 用户名：test2');
+        console.log('   🔑 密码：123456');
+        console.log('   📝 昵称：测试用户2');
+        console.log('   🆔 ID：', user2Id);
+        console.log('');
+        console.log('💡 测试方法：');
+        console.log('   1. 使用 test1 登录');
+        console.log('   2. 进入与 test2 的聊天界面');
+        console.log('   3. 点击右上角三点按钮，开启阅后即焚');
+        console.log('   4. 发送消息后退出聊天框');
+        console.log('   5. 再次进入聊天，消息应该消失');
+        console.log('   6. 刷新浏览器，阅后即焚设置应该保持开启');
         
         client.release();
     } catch (error) {
