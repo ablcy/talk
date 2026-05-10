@@ -1914,7 +1914,7 @@ class ChatApp {
         // 更新日志
         const updateTitle = document.querySelector('#update-header h3');
         if (updateTitle) {
-            updateTitle.textContent = t.updateLog + ' v4.5.8';
+            updateTitle.textContent = t.updateLog + ' v4.5.9';
         }
 
         // 个人页
