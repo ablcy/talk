@@ -1578,8 +1578,34 @@ class ChatApp {
             localStorage.removeItem('currentUser');
             this.currentUser = null;
             this.currentFriend = null;
+            this.currentGroup = null;
             this.messages = {};
             this.friends = [];
+            this.groups = [];
+            this.groupMessages = {};
+            
+            // 清空所有界面元素，防止隐私泄露
+            const chatList = document.getElementById('chat-list');
+            if (chatList) {
+                chatList.innerHTML = '';
+            }
+            const messagesContainer = document.getElementById('messages-container');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = '';
+            }
+            const groupMessagesContainer = document.getElementById('group-messages-container');
+            if (groupMessagesContainer) {
+                groupMessagesContainer.innerHTML = '';
+            }
+            const contactsGroupList = document.getElementById('contacts-group-list');
+            if (contactsGroupList) {
+                contactsGroupList.innerHTML = '';
+            }
+            const contactsFriendList = document.getElementById('contacts-friend-list');
+            if (contactsFriendList) {
+                contactsFriendList.innerHTML = '';
+            }
+            
             document.getElementById('main-screen').style.display = 'none';
             document.getElementById('auth-screen').classList.add('screen');
             document.getElementById('auth-screen').style.display = 'flex';
@@ -1788,7 +1814,7 @@ class ChatApp {
         // 更新日志
         const updateTitle = document.querySelector('#update-header h3');
         if (updateTitle) {
-            updateTitle.textContent = t.updateLog + ' v4.5.1';
+            updateTitle.textContent = t.updateLog + ' v4.5.2';
         }
 
         // 个人页
@@ -1821,11 +1847,11 @@ class ChatApp {
         }
 
         // 页脚
-        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.5.1';
+        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.5.2';
         document.querySelector('.copyright').textContent = t.copyright;
 
         // 版本信息
-        document.querySelector('.version-info span:first-child').textContent = 'v4.5.1';
+        document.querySelector('.version-info span:first-child').textContent = 'v4.5.2';
 
         // 聊天输入框
         document.getElementById('message-input').placeholder = this.currentLang === 'zh' ? '输入消息...' : 'Type a message...';
