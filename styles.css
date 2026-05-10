@@ -295,24 +295,19 @@ form button[type="submit"]:hover {
 .contact-item {
     display: flex;
     align-items: center;
-    padding: 12px 18px;
+    padding: 8px 12px;
     background: var(--white);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     cursor: pointer;
-    transition: all 0.3s;
-    margin: 6px 20px;
-    border-radius: 16px;
-    box-shadow: var(--shadow-sm);
+    transition: background 0.2s;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
 }
 
-.chat-item:hover {
-    background: #FAFAFA;
-}
-
+.chat-item:hover,
 .contact-item:hover {
     background: #FAFAFA;
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
 }
 
 .chat-item .avatar {
@@ -330,19 +325,17 @@ form button[type="submit"]:hover {
 }
 
 .contact-item .avatar {
-    width: 58px;
-    height: 58px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--talk-blue) 0%, var(--talk-dark-blue) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 1.4rem;
+    font-size: 1.1rem;
     font-weight: 600;
-    margin-right: 16px;
-    flex-shrink: 0;
-    box-shadow: var(--shadow-sm);
+    margin-right: 12px;
 }
 
 .chat-item .chat-info {
