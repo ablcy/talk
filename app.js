@@ -1018,6 +1018,7 @@ class ChatApp {
             setTimeout(() => {
                 this.loadMessages();
                 this.startPolling();
+                this.startPasswordVersionCheck();
             }, 0);
         } else {
             this.setButtonLoading('login-form-submit-btn', false);
