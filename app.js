@@ -939,82 +939,40 @@ class ChatApp {
             return;
         }
 
-        // 极致优化：立即切换界面，显示加载状态
-        this.showMainScreenWithLoading();
-        
-        // 后台异步登录，不阻塞界面显示
         this.setButtonLoading('login-form-submit-btn', true);
+        document.getElementById('login-error').textContent = '';
+
         const result = await this.fetchData('/api/login', {
             method: 'POST',
             body: JSON.stringify({ username, password })
         });
+
         this.setButtonLoading('login-form-submit-btn', false);
 
         if (result.success) {
             this.currentUser = result.user;
             localStorage.setItem('currentUser', JSON.stringify(result.user));
-            
-            // 直接使用登录返回的好友和群聊数据
+
             if (result.friends) {
                 this.friends = result.friends;
             }
             if (result.groups) {
                 this.groups = result.groups;
             }
-            
-            // 更新用户信息和渲染列表
+
+            this.showMainScreen();
             this.updateProfile();
             this.renderChatList();
-            
-            // 消息在后台异步加载
-            setTimeout(() => {
-                this.loadMessages();
-                this.startPolling();
-            }, 50);
+            this.loadMessages();
+            this.startPolling();
         } else {
-            // 登录失败，返回登录界面
-            this.logout();
             document.getElementById('login-error').textContent = result.message || '登录失败';
         }
     }
-    
-    showMainScreenWithLoading() {
-        // 立即切换到主界面，不等待数据
+
+    showMainScreen() {
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('main-screen').style.display = 'flex';
-        
-        // 显示加载骨架
-        const chatList = document.getElementById('chat-list');
-        chatList.innerHTML = `
-            <div class="loading-skeleton">
-                <div class="skeleton-avatar"></div>
-                <div class="skeleton-info">
-                    <div class="skeleton-name"></div>
-                    <div class="skeleton-preview"></div>
-                </div>
-            </div>
-            <div class="loading-skeleton">
-                <div class="skeleton-avatar"></div>
-                <div class="skeleton-info">
-                    <div class="skeleton-name"></div>
-                    <div class="skeleton-preview"></div>
-                </div>
-            </div>
-            <div class="loading-skeleton">
-                <div class="skeleton-avatar"></div>
-                <div class="skeleton-info">
-                    <div class="skeleton-name"></div>
-                    <div class="skeleton-preview"></div>
-                </div>
-            </div>
-        `;
-        
-        // 更新头像为默认状态
-        const avatarImg = document.getElementById('profile-avatar-img');
-        const avatarText = document.getElementById('profile-avatar');
-        avatarImg.style.display = 'none';
-        avatarText.textContent = '?';
-        avatarText.style.display = 'flex';
     }
 
     async handleRegister(e) {
@@ -1963,7 +1921,7 @@ class ChatApp {
             logoutConfirm: '确定要退出登录吗？',
             linkCopied: '链接已复制到剪贴板！',
             appName: 'Tell',
-            appDesc: '即时通讯聊天工具',
+            appDesc: '倾听耳边语，细说心底言',
             copyright: '© 2026 Li Chengyan. All Rights Reserved.',
             addFriend: '添加好友',
             createGroup: '创建群聊',
@@ -2003,7 +1961,7 @@ class ChatApp {
             logoutConfirm: 'Are you sure you want to logout?',
             linkCopied: 'Link copied to clipboard!',
             appName: 'Tell',
-            appDesc: 'Instant Messaging Chat Tool',
+            appDesc: 'Listen to whispers, speak your heart',
             copyright: '© 2026 Li Chengyan. All Rights Reserved.',
             addFriend: 'Add Friend',
             createGroup: 'Create Group',
@@ -2093,7 +2051,7 @@ class ChatApp {
         // 更新日志
         const updateTitle = document.querySelector('#update-header h3');
         if (updateTitle) {
-            updateTitle.textContent = t.updateLog + ' v4.8.0';
+            updateTitle.textContent = t.updateLog + ' v4.8.1';
         }
 
         // 个人页
@@ -2126,11 +2084,11 @@ class ChatApp {
         }
 
         // 页脚
-        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.8.0';
+        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.8.1';
         document.querySelector('.copyright').textContent = t.copyright;
 
         // 版本信息
-        document.querySelector('.version-info span:first-child').textContent = 'v4.8.0';
+        document.querySelector('.version-info span:first-child').textContent = 'v4.8.1';
 
         // 聊天输入框
         document.getElementById('message-input').placeholder = this.currentLang === 'zh' ? '输入消息...' : 'Type a message...';
