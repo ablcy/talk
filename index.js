@@ -849,12 +849,60 @@ app.post('/api/admin/logout', (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/admin/verify', (req, res) => {
-  const token = req.headers['x-admin-token'];
-  if (token && validateAdminToken(token)) {
-    res.json({ success: true, username: ADMIN_USERNAME });
+app.post('/api/admin/verify', (req, res) => {
+  const { password } = req.body;
+  
+  if (!password) {
+    return res.status(400).json({ success: false, message: '密码不能为空' });
+  }
+
+  if (password === ADMIN_PASSWORD) {
+    res.json({ success: true });
   } else {
-    res.status(401).json({ success: false, message: '未登录' });
+    res.status(401).json({ success: false, message: '密码错误' });
+  }
+});
+
+app.post('/api/admin/change-password', (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: '请填写所有字段' });
+  }
+
+  if (oldPassword !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: '原密码错误' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ success: false, message: '密码至少需要6个字符' });
+  }
+
+  ADMIN_PASSWORD = newPassword;
+  res.json({ success: true, message: '密码修改成功' });
+});
+
+app.put('/api/admin/users/:userId/password', async (req, res) => {
+  const { userId } = req.params;
+  const { newPassword } = req.body;
+  
+  if (!newPassword) {
+    return res.status(400).json({ success: false, message: '密码不能为空' });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    if (DATABASE_URL) {
+      await usersDB.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+    } else {
+      await promisifyDB(usersDB.update).call(usersDB, { id: userId }, { $set: { password: hashedPassword } });
+    }
+
+    res.json({ success: true, message: '密码修改成功' });
+  } catch (error) {
+    console.error('Update user password error:', error);
+    res.status(500).json({ success: false, message: '修改失败' });
   }
 });
 
