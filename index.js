@@ -1684,6 +1684,43 @@ app.post('/api/group/join', async (req, res) => {
   }
 });
 
+app.get('/api/fix-db', async (req, res) => {
+  if (!DATABASE_URL) {
+    return res.json({ success: false, message: 'Not using PostgreSQL' });
+  }
+  
+  try {
+    // 添加nickname列
+    try {
+      await usersDB.query('ALTER TABLE users ADD COLUMN nickname TEXT');
+      console.log('Added nickname column');
+    } catch (e) {
+      console.log('nickname column may already exist');
+    }
+    
+    // 添加avatar列
+    try {
+      await usersDB.query('ALTER TABLE users ADD COLUMN avatar TEXT');
+      console.log('Added avatar column');
+    } catch (e) {
+      console.log('avatar column may already exist');
+    }
+    
+    // 添加type列到messages
+    try {
+      await messagesDB.query("ALTER TABLE messages ADD COLUMN type TEXT DEFAULT 'text'");
+      console.log('Added type column to messages');
+    } catch (e) {
+      console.log('type column may already exist in messages');
+    }
+    
+    res.json({ success: true, message: 'Database fixed successfully' });
+  } catch (error) {
+    console.error('Fix DB error:', error);
+    res.status(500).json({ success: false, message: `Fix failed: ${error.message}` });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Tell server running on port ${PORT}`);
   console.log(DATABASE_URL ? 'Using PostgreSQL' : 'Using NeDB for development');
