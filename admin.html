@@ -14,7 +14,7 @@
                 <img src="logo.jpg" alt="Tell Logo" class="password-logo">
                 <h1>Tell Admin</h1>
                 <p>请输入管理员密码</p>
-                <span class="login-version">v4.9.3</span>
+                <span class="login-version">v4.9.2</span>
             </div>
             
             <form id="password-form">
@@ -39,7 +39,7 @@
                 </div>
                 <div class="header-right">
                     <button id="change-pwd-btn" class="btn btn-secondary">修改密码</button>
-                    <span class="version-badge">v4.9.3</span>
+                    <span class="version-badge">v4.9.2</span>
                     <a href="/" class="back-link">← 返回应用</a>
                 </div>
             </div>
@@ -109,40 +109,68 @@
                 <div class="logs-container" id="logs-container">
                     <div class="log-entry">
                         <span class="log-time">[系统]</span>
-                        <span class="log-message">Tell Admin v4.9.3 启动成功</span>
+                        <span class="log-message">Tell Admin v4.9.2 启动成功</span>
                     </div>
                 </div>
             </section>
 
             <section class="changelog-section">
                 <div class="section-header changelog-header">
-                    <h2>📝 更新日志</h2>
+                    <h2>📝 更新日志 v4.9.2 202605111538</h2>
                     <button id="toggle-changelog-btn" class="btn btn-secondary">▼ 展开</button>
                 </div>
                 <div class="changelog-content" id="changelog-content" style="display: none;">
                     <div class="changelog-item">
-                        <div class="changelog-version">v4.9.3 202605111530</div>
+                        <div class="changelog-version">✨ v4.9.2 202605111538</div>
                         <ul class="changelog-list">
+                            <li>登录提示用户不存在/密码错误</li>
+                            <li>密码修改后用户5秒内强制下线</li>
                             <li>修复管理员密码修改失败问题</li>
                             <li>解除密码字符限制</li>
-                            <li>添加折叠式更新日志显示</li>
-                            <li>优化管理后台移动端显示</li>
+                            <li>管理后台添加折叠式更新日志</li>
                         </ul>
                     </div>
                     <div class="changelog-item">
-                        <div class="changelog-version">v4.9.2 202605111400</div>
+                        <div class="changelog-version">✨ v4.9.1 202605111513</div>
                         <ul class="changelog-list">
-                            <li>实现密码修改后用户5秒内强制下线功能</li>
-                            <li>在线上环境创建测试账号</li>
-                            <li>修复用户密码修改时密码版本号更新问题</li>
+                            <li>后台管理添加密码验证（默认密码admin）</li>
+                            <li>支持修改管理员密码和所有用户密码</li>
+                            <li>优化移动端显示</li>
                         </ul>
                     </div>
                     <div class="changelog-item">
-                        <div class="changelog-version">v4.9.1 202605111200</div>
+                        <div class="changelog-version">✨ v4.9.0 202605111455</div>
                         <ul class="changelog-list">
-                            <li>整合后台管理系统到发现界面</li>
-                            <li>添加管理员密码验证功能</li>
-                            <li>新增修改所有用户密码功能</li>
+                            <li>移除独立admin登录系统</li>
+                            <li>在发现界面添加后台管理入口</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-item">
+                        <div class="changelog-version">✨ v4.8.9 202605111445</div>
+                        <ul class="changelog-list">
+                            <li>为所有现有用户添加自己为好友</li>
+                            <li>通讯录中显示"（我）"标识</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-item">
+                        <div class="changelog-version">✨ v4.8.8 202605111438</div>
+                        <ul class="changelog-list">
+                            <li>用户注册后自动添加自己为好友</li>
+                            <li>消息界面显示"（我）"标识</li>
+                            <li>无法删除自己</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-item">
+                        <div class="changelog-version">✨ v4.8.7 202605111425</div>
+                        <ul class="changelog-list">
+                            <li>注册用户名长度限制改为1个字符</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-item">
+                        <div class="changelog-version">✨ v4.8.6 202605111415</div>
+                        <ul class="changelog-list">
+                            <li>修复注册和登录问题</li>
+                            <li>添加数据库修复API</li>
                         </ul>
                     </div>
                 </div>
