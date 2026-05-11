@@ -128,6 +128,7 @@ async function initDB() {
           id TEXT PRIMARY KEY,
           username TEXT UNIQUE NOT NULL,
           password TEXT NOT NULL,
+          password_version INTEGER DEFAULT 1,
           avatar TEXT,
           nickname TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -143,6 +144,12 @@ async function initDB() {
       
       try {
         await usersDB.query('ALTER TABLE users ADD COLUMN nickname TEXT');
+      } catch (e) {
+        // 列已存在，忽略错误
+      }
+      
+      try {
+        await usersDB.query('ALTER TABLE users ADD COLUMN password_version INTEGER DEFAULT 1');
       } catch (e) {
         // 列已存在，忽略错误
       }
@@ -413,7 +420,7 @@ async function addSelfAsFriend(userId) {
 }
 
 app.post('/api/verify', async (req, res) => {
-  const { userId } = req.body;
+  const { userId, passwordVersion } = req.body;
   
   if (!userId) {
     return res.status(400).json({ success: false, message: '用户ID不能为空' });
@@ -422,7 +429,7 @@ app.post('/api/verify', async (req, res) => {
   try {
     let user;
     if (DATABASE_URL) {
-      user = await usersDB.query('SELECT id, username FROM users WHERE id = $1', [userId]);
+      user = await usersDB.query('SELECT id, username, password_version FROM users WHERE id = $1', [userId]);
     } else {
       user = await promisifyDB(usersDB.find).call(usersDB, { id: userId });
     }
@@ -433,7 +440,13 @@ app.post('/api/verify', async (req, res) => {
       return res.status(401).json({ success: false, message: '用户不存在' });
     }
 
-    res.json({ success: true, user: { id: userData.id, username: userData.username } });
+    const currentVersion = userData.password_version || 1;
+    
+    if (passwordVersion && currentVersion > passwordVersion) {
+      return res.status(401).json({ success: false, message: '密码已被修改，请重新登录' });
+    }
+
+    res.json({ success: true, user: { id: userData.id, username: userData.username, password_version: currentVersion } });
   } catch (error) {
     console.error('Verify user error:', error);
     res.status(500).json({ success: false, message: '验证失败' });
@@ -451,7 +464,7 @@ app.post('/api/login', async (req, res) => {
     let user;
     if (DATABASE_URL) {
       user = await usersDB.query(
-        'SELECT id, username, password, avatar, nickname FROM users WHERE username = $1',
+        'SELECT id, username, password, password_version, avatar, nickname FROM users WHERE username = $1',
         [username]
       );
     } else {
@@ -462,13 +475,13 @@ app.post('/api/login', async (req, res) => {
     const userData = DATABASE_URL ? user.rows[0] : user[0];
 
     if (!userData) {
-      return res.status(400).json({ success: false, message: '用户名或密码错误' });
+      return res.status(400).json({ success: false, message: '用户不存在' });
     }
 
     const passwordMatch = await bcrypt.compare(password, userData.password);
 
     if (!passwordMatch) {
-      return res.status(400).json({ success: false, message: '用户名或密码错误' });
+      return res.status(400).json({ success: false, message: '密码错误' });
     }
 
     // 批量加载好友和群聊数据
@@ -527,7 +540,8 @@ app.post('/api/login', async (req, res) => {
         id: userData.id, 
         username: userData.username,
         avatar: userData.avatar || null,
-        nickname: userData.nickname || ''
+        nickname: userData.nickname || '',
+        password_version: userData.password_version || 1
       },
       friends: friendsData,
       groups: groupsData
@@ -922,9 +936,9 @@ app.put('/api/admin/users/:userId/password', async (req, res) => {
     const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
 
     if (DATABASE_URL) {
-      await usersDB.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+      await usersDB.query('UPDATE users SET password = $1, password_version = password_version + 1 WHERE id = $2', [hashedPassword, userId]);
     } else {
-      await promisifyDB(usersDB.update).call(usersDB, { id: userId }, { $set: { password: hashedPassword } });
+      await promisifyDB(usersDB.update).call(usersDB, { id: userId }, { $set: { password: hashedPassword, password_version: (Date.now() / 1000) | 0 } });
     }
 
     res.json({ success: true, message: '密码修改成功' });

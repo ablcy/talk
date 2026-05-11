@@ -770,15 +770,16 @@ class ChatApp {
             try {
                 const result = await this.fetchData('/api/verify', {
                     method: 'POST',
-                    body: JSON.stringify({ userId: this.currentUser.id })
+                    body: JSON.stringify({ userId: this.currentUser.id, passwordVersion: this.currentUser.password_version })
                 });
                 
                 if (!result.success) {
-                    throw new Error('登录状态已失效');
+                    throw new Error(result.message || '登录状态已失效');
                 }
             } catch (error) {
                 localStorage.removeItem('currentUser');
                 this.currentUser = null;
+                alert(error.message || '登录状态已失效，请重新登录');
                 return;
             }
             
@@ -794,8 +795,37 @@ class ChatApp {
                 setTimeout(() => {
                     this.loadMessages();
                     this.startPolling();
+                    this.startPasswordVersionCheck();
                 }, 100);
             });
+        }
+    }
+
+    startPasswordVersionCheck() {
+        this.passwordCheckInterval = setInterval(async () => {
+            if (!this.currentUser) return;
+            
+            try {
+                const result = await this.fetchData('/api/verify', {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: this.currentUser.id, passwordVersion: this.currentUser.password_version })
+                });
+                
+                if (!result.success) {
+                    this.stopPasswordVersionCheck();
+                    this.logout();
+                    alert('密码已被修改，请重新登录');
+                }
+            } catch (error) {
+                // 忽略网络错误
+            }
+        }, 5000);
+    }
+
+    stopPasswordVersionCheck() {
+        if (this.passwordCheckInterval) {
+            clearInterval(this.passwordCheckInterval);
+            this.passwordCheckInterval = null;
         }
     }
 
@@ -1800,6 +1830,7 @@ class ChatApp {
     logout() {
         if (confirm('确定要退出登录吗？')) {
             this.stopPolling();
+            this.stopPasswordVersionCheck();
             localStorage.removeItem('currentUser');
             this.currentUser = null;
             this.currentFriend = null;
@@ -2076,7 +2107,7 @@ class ChatApp {
         // 更新日志
         const updateTitle = document.querySelector('#update-header h3');
         if (updateTitle) {
-            updateTitle.textContent = t.updateLog + ' v4.9.1';
+            updateTitle.textContent = t.updateLog + ' v4.9.2';
         }
 
         // 个人页
@@ -2109,11 +2140,11 @@ class ChatApp {
         }
 
         // 页脚
-        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.9.1';
+        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.9.2';
         document.querySelector('.copyright').textContent = t.copyright;
 
         // 版本信息
-        document.querySelector('.version-info span:first-child').textContent = 'v4.9.1';
+        document.querySelector('.version-info span:first-child').textContent = 'v4.9.2';
 
         // 聊天输入框
         document.getElementById('message-input').placeholder = this.currentLang === 'zh' ? '输入消息...' : 'Type a message...';
