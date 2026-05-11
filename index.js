@@ -1097,6 +1097,8 @@ app.get('/api/admin/groups', async (req, res) => {
       
       return {
         ...group,
+        // 合并群名称和群号为群号，优先显示群名称，没有则显示群号
+        group_number: group.name || group.group_number,
         member_count: parseInt(memberCount) || 0,
         owner_name: ownerName
       };

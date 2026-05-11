@@ -54,7 +54,7 @@ class AdminPanel {
         this.loadStats();
         this.loadUsers();
         this.loadGroups();
-        this.addLog('Tell Admin v4.9.3 启动成功', '系统');
+        this.addLog('Tell Admin v4.9.4 启动成功', '系统');
     }
 
     bindEvents() {
@@ -185,7 +185,7 @@ class AdminPanel {
         const tbody = document.getElementById('groups-table-body');
         
         if (this.filteredGroups.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6">暂无群聊</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5">暂无群聊</td></tr>';
             return;
         }
 
@@ -194,13 +194,12 @@ class AdminPanel {
             return `
                 <tr>
                     <td>${group.group_number}</td>
-                    <td>${group.name}</td>
                     <td>${group.owner_name}</td>
                     <td>${group.member_count}</td>
                     <td>${createdAt}</td>
                     <td>
                         <div class="action-buttons">
-                            <button class="btn btn-danger btn-sm" onclick="admin.deleteGroup('${group.id}', '${group.name}')">解散</button>
+                            <button class="btn btn-danger btn-sm" onclick="admin.deleteGroup('${group.id}', '${group.group_number}')">解散</button>
                         </div>
                     </td>
                 </tr>
