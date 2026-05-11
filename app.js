@@ -802,6 +802,7 @@ class ChatApp {
 
         document.getElementById('logout-btn').addEventListener('click', () => this.logout());
         document.getElementById('share-app-btn').addEventListener('click', () => this.shareApp());
+        document.getElementById('admin-panel-btn').addEventListener('click', () => window.location.href = '/admin');
 
         document.getElementById('upload-avatar-btn').addEventListener('click', () => {
             document.getElementById('avatar-upload-input').click();
@@ -2060,7 +2061,7 @@ class ChatApp {
         // 更新日志
         const updateTitle = document.querySelector('#update-header h3');
         if (updateTitle) {
-            updateTitle.textContent = t.updateLog + ' v4.8.9';
+            updateTitle.textContent = t.updateLog + ' v4.9.0';
         }
 
         // 个人页
@@ -2093,11 +2094,11 @@ class ChatApp {
         }
 
         // 页脚
-        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.8.9';
+        document.querySelector('.footer-info p:first-child').textContent = 'Tell v4.9.0';
         document.querySelector('.copyright').textContent = t.copyright;
 
         // 版本信息
-        document.querySelector('.version-info span:first-child').textContent = 'v4.8.9';
+        document.querySelector('.version-info span:first-child').textContent = 'v4.9.0';
 
         // 聊天输入框
         document.getElementById('message-input').placeholder = this.currentLang === 'zh' ? '输入消息...' : 'Type a message...';

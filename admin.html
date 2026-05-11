@@ -3,45 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YanTalk Admin - 用户管理后台</title>
+    <title>Tell Admin - 用户管理后台</title>
     <link rel="icon" href="logo.png" type="image/png">
     <link rel="stylesheet" href="admin.css">
 </head>
 <body>
-    <div id="login-screen" class="login-screen">
-        <div class="login-container">
-            <div class="login-header">
-                <div class="admin-logo">🔒</div>
-                <h1>YanTalk Admin</h1>
-                <p>管理员登录</p>
-            </div>
-            
-            <form id="login-form">
-                <div class="form-group">
-                    <label>用户名</label>
-                    <input type="text" id="username" placeholder="请输入用户名" required>
-                </div>
-                <div class="form-group">
-                    <label>密码</label>
-                    <input type="password" id="password" placeholder="请输入密码" required>
-                </div>
-                <p class="error-message" id="login-error"></p>
-                <button type="submit" class="btn btn-primary btn-block">登录</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="app" style="display: none;">
+    <div id="app">
         <header class="admin-header">
             <div class="header-content">
                 <div class="admin-header-title">
-                    <img src="logo.jpg" alt="YanTalk Logo" class="admin-header-logo">
-                    <h1>YanTalk Admin</h1>
+                    <img src="logo.jpg" alt="Tell Logo" class="admin-header-logo">
+                    <h1>Tell Admin</h1>
                 </div>
                 <div class="header-right">
-                    <span id="current-user" class="user-badge"></span>
-                    <span class="version-badge">v1.2.4</span>
-                    <button id="logout-btn" class="btn btn-secondary">退出登录</button>
+                    <span class="version-badge">v1.0.0</span>
                     <a href="/" class="back-link">← 返回应用</a>
                 </div>
             </div>
