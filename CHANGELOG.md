@@ -1,5 +1,22 @@
 # 更新日志
 
+## ✨ v5.5.0 202604230753
+
+- 配置阿里云服务器(114.215.182.61)作为TURN中继服务器
+- 设置TURN用户名为 telluser，密码为 tellpassword123
+- 优先使用阿里云TURN服务器，解决跨网络视频通话问题
+- 添加TCP传输协议支持，穿透防火墙限制
+- 更新docker-compose.yml配置文件
+
+## ✨ v5.4.0 202605121945
+
+- 增强跨网络视频通话能力
+- 添加更多STUN服务器（cloudflare、ekiga、qq、nextcloud）
+- 添加更多TURN服务器（openrelay.metered.ca、relay.metered.ca、webwormhole.io）
+- 添加TCP传输协议支持，解决UDP被阻止的问题
+- 优化ICE候选池大小为20，提高连接成功率
+- 添加sdpSemantics配置，确保浏览器兼容性
+
 ## ✨ v5.1.0 202604230753
 
 - 优化登录和加载速度

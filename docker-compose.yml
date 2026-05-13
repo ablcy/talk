@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn-server
+    network_mode: host
+    restart: unless-stopped
+    command: >
+      -n
+      --listening-port=3478
+      --tls-listening-port=5349
+      --external-ip=114.215.182.61
+      --realm=link.tell.chat
+      --user=telluser:tellpassword123
+      --min-port=49152
+      --max-port=65535
+      --verbose
+      --log-file=/var/log/coturn.log
+    volumes:
+      - ./coturn/logs:/var/log
+      - ./coturn/certs:/etc/coturn/certs
+    environment:
+      - TZ=Asia/Shanghai
+
+networks:
+  default:
+    external:
+      name: host

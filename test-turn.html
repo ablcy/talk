@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TURN 服务器测试工具</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 10px 5px; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>TURN 服务器连接测试</h1>
+    
+    <div>
+        <h3>测试服务器配置</h3>
+        <pre id="config">
+TURN 服务器: turn:114.215.182.61:3478
+用户名: telluser
+密码: tellpassword123
+        </pre>
+    </div>
+
+    <div>
+        <button onclick="testTURN()">测试 TURN 服务器连接</button>
+        <button onclick="testSTUN()">测试 STUN 服务器</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const turnConfig = {
+            iceServers: [
+                {
+                    urls: ['turn:114.215.182.61:3478', 'turn:114.215.182.61:3478?transport=tcp'],
+                    username: 'telluser',
+                    credential: 'tellpassword123'
+                },
+                {
+                    urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478']
+                }
+            ]
+        };
+
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${message}`;
+            results.appendChild(div);
+        }
+
+        async function testTURN() {
+            log('开始测试 TURN 服务器...', 'info');
+            try {
+                const pc = new RTCPeerConnection(turnConfig);
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        log(`获得 ICE 候选: ${event.candidate.candidate}`, 'info');
+                        if (event.candidate.type === 'relay') {
+                            log('✅ TURN 中继连接成功！', 'success');
+                        }
+                    }
+                };
+                pc.oniceconnectionstatechange = () => {
+                    log(`ICE 状态: ${pc.iceConnectionState}`, 'info');
+                    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                        log('✅ WebRTC 连接成功建立！', 'success');
+                    }
+                    if (pc.iceConnectionState === 'failed') {
+                        log('❌ 连接失败！请检查 TURN 服务器配置', 'error');
+                    }
+                };
+                const dataChannel = pc.createDataChannel('test');
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                log('已创建 WebRTC 连接并发送 offer', 'info');
+                setTimeout(() => {
+                    pc.close();
+                    log('测试完成', 'info');
+                }, 10000);
+            } catch (error) {
+                log(`❌ 错误: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        async function testSTUN() {
+            log('开始测试 STUN 服务器...', 'info');
+            try {
+                const pc = new RTCPeerConnection({
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' }
+                    ]
+                });
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        log(`获得 ICE 候选: ${event.candidate.candidate}`, 'info');
+                    }
+                };
+                pc.oniceconnectionstatechange = () => {
+                    log(`ICE 状态: ${pc.iceConnectionState}`, 'info');
+                };
+                const dataChannel = pc.createDataChannel('test');
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                log('STUN 测试完成', 'info');
+                setTimeout(() => pc.close(), 5000);
+            } catch (error) {
+                log(`❌ 错误: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

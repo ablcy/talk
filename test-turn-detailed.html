@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TURN 服务器详细测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 50px auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        .log-item { padding: 8px; margin: 4px 0; border-radius: 4px; font-family: monospace; font-size: 12px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #e7f3ff; color: #0c5460; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; }
+        pre { background: #f5f5f5; padding: 15px; overflow-x: auto; border-radius: 4px; }
+        .config-item { margin: 10px 0; }
+        .candidate-info { margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 TURN 服务器详细诊断工具</h1>
+    
+    <div class="section">
+        <h3>📋 当前配置</h3>
+        <div class="config-item"><strong>主 TURN 服务器:</strong> turn:114.215.182.61:3478</div>
+        <div class="config-item"><strong>用户名:</strong> telluser</div>
+        <div class="config-item"><strong>密码:</strong> tellpassword123</div>
+        <div class="config-item"><strong>传输方式:</strong> UDP + TCP</div>
+    </div>
+
+    <div class="section">
+        <h3>🛠️ 测试工具</h3>
+        <button onclick="testTURNServer()">1️⃣ 测试 TURN 服务器连接</button>
+        <button onclick="testSTUNServer()">2️⃣ 测试 STUN 服务器</button>
+        <button onclick="testRelayCandidate()">3️⃣ 测试中继候选生成</button>
+        <button onclick="checkNetwork()">4️⃣ 检查网络连接</button>
+        <button onclick="clearLogs()">🔄 清除日志</button>
+    </div>
+
+    <div class="section">
+        <h3>📝 测试日志</h3>
+        <div id="logs"></div>
+    </div>
+
+    <div class="section">
+        <h3>📊 ICE 候选信息</h3>
+        <div id="candidates"></div>
+    </div>
+
+    <script>
+        const turnConfig = {
+            iceServers: [
+                {
+                    urls: ['turn:relay.metered.ca:80', 'turn:relay.metered.ca:443'],
+                    username: 'MeteredTurnServer',
+                    credential: '8h95q4a7tb8z'
+                },
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun.cloudflare.com:3478' }
+            ],
+            iceTransportPolicy: 'all',
+            iceCandidatePoolSize: 20
+        };
+
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const div = document.createElement('div');
+            div.className = `log-item ${type}`;
+            div.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${message}`;
+            logs.prepend(div);
+            console.log(message);
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            document.getElementById('candidates').innerHTML = '';
+        }
+
+        async function checkNetwork() {
+            log('开始检查网络连接...', 'info');
+            try {
+                // 检查 STUN 服务器
+                const stunResponse = await fetch('https://stun.stunprotocol.org');
+                log(`STUN 服务器可达: ${stunResponse.ok}`, stunResponse.ok ? 'success' : 'error');
+                
+                // 检查 TURN 服务器端口
+                const turnPort = await checkPort('114.215.182.61', 3478);
+                log(`TURN 端口 3478: ${turnPort ? '开放' : '关闭'}`, turnPort ? 'success' : 'error');
+                
+                // 检查媒体端口范围
+                const mediaPort = await checkPort('114.215.182.61', 50000);
+                log(`媒体端口 50000: ${mediaPort ? '开放' : '关闭'}`, mediaPort ? 'success' : 'error');
+                
+            } catch (error) {
+                log(`网络检查失败: ${error.message}`, 'error');
+            }
+        }
+
+        function checkPort(host, port) {
+            return new Promise((resolve) => {
+                const timeout = 3000;
+                const startTime = Date.now();
+                
+                const socket = new WebSocket(`wss://${host}:${port}`);
+                socket.onerror = () => {
+                    // WebSocket 失败，尝试其他方式
+                    resolve(false);
+                };
+                socket.onopen = () => {
+                    socket.close();
+                    resolve(true);
+                };
+                socket.onclose = () => resolve(false);
+                
+                setTimeout(() => {
+                    socket.close();
+                    resolve(false);
+                }, timeout);
+            });
+        }
+
+        async function testSTUNServer() {
+            log('开始测试 STUN 服务器...', 'info');
+            try {
+                const pc = new RTCPeerConnection({
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                });
+                
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        log(`STUN 候选生成: ${event.candidate.type} - ${event.candidate.address}`, 'success');
+                        displayCandidate(event.candidate);
+                    }
+                };
+                
+                pc.onicegatheringstatechange = () => {
+                    if (pc.iceGatheringState === 'complete') {
+                        log('STUN 测试完成', 'success');
+                        pc.close();
+                    }
+                };
+                
+                pc.createDataChannel('test');
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+            } catch (error) {
+                log(`STUN 测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testTURNServer() {
+            log('开始测试 TURN 服务器...', 'info');
+            log('配置: turn:114.215.182.61:3478, 用户: telluser', 'info');
+            
+            try {
+                const pc = new RTCPeerConnection(turnConfig);
+                let relayCandidateFound = false;
+                
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        log(`ICE 候选: ${event.candidate.type} - ${event.candidate.address}:${event.candidate.port}`, 
+                            event.candidate.type === 'relay' ? 'success' : 'info');
+                        displayCandidate(event.candidate);
+                        
+                        if (event.candidate.type === 'relay') {
+                            relayCandidateFound = true;
+                            log('✅ TURN 中继候选生成成功！', 'success');
+                        }
+                    }
+                };
+                
+                pc.onicegatheringstatechange = () => {
+                    log(`ICE 收集状态: ${pc.iceGatheringState}`, 'info');
+                    if (pc.iceGatheringState === 'complete') {
+                        if (relayCandidateFound) {
+                            log('🎉 TURN 服务器工作正常！', 'success');
+                        } else {
+                            log('❌ 未生成中继候选，请检查 TURN 服务器配置', 'error');
+                        }
+                        pc.close();
+                    }
+                };
+                
+                pc.oniceconnectionstatechange = () => {
+                    log(`ICE 连接状态: ${pc.iceConnectionState}`, 'info');
+                };
+                
+                pc.createDataChannel('test');
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+            } catch (error) {
+                log(`❌ TURN 测试失败: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        async function testRelayCandidate() {
+            log('专门测试中继候选生成...', 'info');
+            
+            const configs = [
+                { name: '阿里云 TURN UDP', urls: 'turn:114.215.182.61:3478' },
+                { name: '阿里云 TURN TCP', urls: 'turn:114.215.182.61:3478?transport=tcp' },
+                { name: 'Metered TURN', urls: 'turn:relay.metered.ca:80' }
+            ];
+            
+            for (const config of configs) {
+                log(`测试: ${config.name}`, 'info');
+                try {
+                    const pc = new RTCPeerConnection({
+                        iceServers: [{
+                            urls: config.urls,
+                            username: config.name.includes('阿里云') ? 'telluser' : 'MeteredTurnServer',
+                            credential: config.name.includes('阿里云') ? 'tellpassword123' : '8h95q4a7tb8z'
+                        }],
+                        iceTransportPolicy: 'relay' // 强制使用中继
+                    });
+                    
+                    pc.onicecandidate = (event) => {
+                        if (event.candidate) {
+                            log(`  ${config.name} 生成候选: ${event.candidate.type}`, 
+                                event.candidate.type === 'relay' ? 'success' : 'error');
+                        }
+                    };
+                    
+                    pc.onicegatheringstatechange = () => {
+                        if (pc.iceGatheringState === 'complete') {
+                            pc.close();
+                        }
+                    };
+                    
+                    pc.createDataChannel('test');
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    
+                } catch (error) {
+                    log(`  ❌ ${config.name} 失败: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        function displayCandidate(candidate) {
+            const div = document.createElement('div');
+            div.className = 'candidate-info';
+            div.innerHTML = `
+                <strong>类型:</strong> ${candidate.type} | 
+                <strong>地址:</strong> ${candidate.address}:${candidate.port} | 
+                <strong>协议:</strong> ${candidate.protocol}
+            `;
+            document.getElementById('candidates').appendChild(div);
+        }
+    </script>
+</body>
+</html>

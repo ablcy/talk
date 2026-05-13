@@ -6,13 +6,86 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
+
+// 存储在线用户和socket映射
+const onlineUsers = new Map();
+
+io.on('connection', (socket) => {
+  socket.on('login', (userId) => {
+    onlineUsers.set(userId, socket.id);
+    socket.userId = userId;
+    console.log(`User ${userId} connected`);
+  });
+
+  socket.on('disconnect', () => {
+    if (socket.userId) {
+      onlineUsers.delete(socket.userId);
+      console.log(`User ${socket.userId} disconnected`);
+    }
+  });
+
+  // 信令消息转发
+  socket.on('call', (data) => {
+    const targetSocketId = onlineUsers.get(data.targetId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('call', {
+        from: socket.userId,
+        fromUsername: data.fromUsername,
+        offer: data.offer
+      });
+    }
+  });
+
+  socket.on('answer', (data) => {
+    const targetSocketId = onlineUsers.get(data.targetId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('answer', {
+        from: socket.userId,
+        answer: data.answer
+      });
+    }
+  });
+
+  socket.on('ice-candidate', (data) => {
+    const targetSocketId = onlineUsers.get(data.targetId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('ice-candidate', {
+        from: socket.userId,
+        candidate: data.candidate
+      });
+    }
+  });
+
+  socket.on('call-end', (data) => {
+    const targetSocketId = onlineUsers.get(data.targetId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('call-end', { from: socket.userId });
+    }
+  });
+
+  socket.on('call-reject', (data) => {
+    const targetSocketId = onlineUsers.get(data.targetId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('call-reject', { from: socket.userId });
+    }
+  });
+});
 
 // 确保uploads目录存在
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -1972,7 +2045,7 @@ app.get('/api/fix-db', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Tell server running on port ${PORT}`);
   console.log(DATABASE_URL ? 'Using PostgreSQL' : 'Using NeDB for development');
 });

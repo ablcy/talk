@@ -17,6 +17,15 @@ class ChatApp {
         this.groupMessages = {};
         this.burnAfterReadingFriendId = null;
         this.burnAfterReadingGroupId = null;
+        
+        // WebRTC相关
+        this.socket = null;
+        this.peerConnection = null;
+        this.localStream = null;
+        this.remoteStream = null;
+        this.isInCall = false;
+        this.currentCallTarget = null;
+        
         this.loadBurnAfterReadingSetting();
         this.init();
     }
@@ -49,6 +58,53 @@ class ChatApp {
         this.loadTheme();
         this.loadUserData();
         this.startUptimeTimer();
+        this.initSocket();
+    }
+    
+    initSocket() {
+        this.socket = io();
+        
+        this.socket.on('connect', () => {
+            console.log('Socket connected');
+            if (this.currentUser) {
+                this.socket.emit('login', this.currentUser.id);
+            }
+        });
+        
+        this.socket.on('disconnect', () => {
+            console.log('Socket disconnected');
+        });
+        
+        // 监听来电
+        this.socket.on('call', (data) => {
+            this.handleIncomingCall(data);
+        });
+        
+        // 监听对方应答
+        this.socket.on('answer', (data) => {
+            this.handleAnswer(data);
+        });
+        
+        // 监听ICE候选
+        this.socket.on('ice-candidate', (data) => {
+            this.handleIceCandidate(data);
+        });
+        
+        // 监听通话结束
+        this.socket.on('call-end', (data) => {
+            this.handleCallEnd(data);
+        });
+        
+        // 监听通话拒绝
+        this.socket.on('call-reject', (data) => {
+            this.handleCallReject(data);
+        });
+    }
+    
+    loginSocket() {
+        if (this.socket && this.currentUser) {
+            this.socket.emit('login', this.currentUser.id);
+        }
     }
 
     initGroupEvents() {
@@ -60,10 +116,7 @@ class ChatApp {
             this.showCreateGroupModal();
             this.closeTabPlusMenu();
         });
-        document.getElementById('discover-create-group-menu-item').addEventListener('click', () => {
-            this.showCreateGroupModal();
-            this.closeTabPlusMenu();
-        });
+
         document.getElementById('close-create-group-modal').addEventListener('click', () => this.closeCreateGroupModal());
         document.getElementById('confirm-create-group-btn').addEventListener('click', () => this.createGroup());
 
@@ -84,10 +137,7 @@ class ChatApp {
             this.toggleContactsPlusMenu();
         });
 
-        document.getElementById('discover-plus-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.toggleDiscoverPlusMenu();
-        });
+
 
         document.addEventListener('click', () => this.closeTabPlusMenu());
 
@@ -166,15 +216,514 @@ class ChatApp {
     closeTabPlusMenu() {
         const menu = document.getElementById('tab-plus-menu');
         const contactsMenu = document.getElementById('contacts-plus-menu');
-        const discoverMenu = document.getElementById('discover-plus-menu');
         menu.classList.remove('visible');
         contactsMenu.classList.remove('visible');
-        discoverMenu.classList.remove('visible');
         setTimeout(() => {
             menu.style.display = 'none';
             contactsMenu.style.display = 'none';
-            discoverMenu.style.display = 'none';
         }, 150);
+    }
+
+    togglePlusMenu() {
+        const menu = document.getElementById('plus-menu');
+        const isVisible = menu.style.display === 'block';
+        if (isVisible) {
+            menu.style.display = 'none';
+        } else {
+            menu.style.display = 'block';
+        }
+    }
+
+    closePlusMenu() {
+        const menu = document.getElementById('plus-menu');
+        menu.style.display = 'none';
+    }
+
+    async initiateCall() {
+        if (!this.currentFriend) {
+            alert('请先选择一个好友');
+            return;
+        }
+        
+        if (this.isInCall) {
+            alert('您正在通话中');
+            return;
+        }
+        
+        this.currentCallTarget = this.currentFriend;
+        this.isInCall = true;
+        
+        try {
+            // 获取本地媒体流（视频+音频）
+            this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            
+            // 创建PeerConnection
+            this.peerConnection = this.createPeerConnection();
+            
+            // 添加本地流到PeerConnection
+            this.localStream.getTracks().forEach(track => {
+                this.peerConnection.addTrack(track, this.localStream);
+            });
+            
+            // 创建Offer
+            const offer = await this.peerConnection.createOffer();
+            await this.peerConnection.setLocalDescription(offer);
+            
+            // 显示呼叫界面
+            this.showCallModal('outgoing');
+            
+            // 显示本地视频
+            this.showLocalVideo();
+            
+            // 发送呼叫请求
+            this.socket.emit('call', {
+                targetId: this.currentFriend.id,
+                fromUsername: this.currentUser.username,
+                offer: offer
+            });
+        } catch (error) {
+            console.error('Failed to initiate call:', error);
+            alert('无法发起通话，请检查麦克风权限');
+            this.endCall();
+        }
+    }
+    
+    createPeerConnection() {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        
+        const iceServers = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun.cloudflare.com:3478' },
+            { urls: 'stun:stun.qq.com:3478' }
+        ];
+        
+        iceServers.push({
+            urls: ['turn:114.215.182.61:3478', 'turn:114.215.182.61:3478?transport=tcp'],
+            username: 'telluser',
+            credential: 'tellpass2024'
+        });
+        iceServers.push({
+            urls: ['turn:relay.metered.ca:80', 'turn:relay.metered.ca:443'],
+            username: 'MeteredTurnServer',
+            credential: '8h95q4a7tb8z'
+        });
+        iceServers.push({
+            urls: ['turn:turn.openrelay.metered.ca:80', 'turn:turn.openrelay.metered.ca:443'],
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        });
+        
+        if (isLocal) {
+            iceServers.unshift({
+                urls: ['turn:localhost:3478', 'turn:localhost:3478?transport=tcp'],
+                username: 'test',
+                credential: 'test123'
+            });
+        }
+        
+        const configuration = {
+            iceServers: iceServers,
+            iceTransportPolicy: 'all',
+            bundlePolicy: 'max-bundle',
+            rtcpMuxPolicy: 'require',
+            iceCandidatePoolSize: 20,
+            sdpSemantics: 'unified-plan'
+        };
+        
+        const pc = new RTCPeerConnection(configuration);
+        
+        console.log('Created PeerConnection with config:', {
+            iceServers: iceServers.length,
+            transportPolicy: configuration.iceTransportPolicy
+        });
+        
+        // 监听ICE候选
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                console.log('ICE candidate generated - type:', event.candidate.type, ', protocol:', event.candidate.protocol);
+                if (this.currentCallTarget) {
+                    this.socket.emit('ice-candidate', {
+                        targetId: this.currentCallTarget.id,
+                        candidate: event.candidate
+                    });
+                }
+            } else {
+                console.log('ICE gathering complete');
+            }
+        };
+        
+        // 监听ICE连接状态
+        pc.oniceconnectionstatechange = () => {
+            console.log('ICE connection state:', pc.iceConnectionState);
+            if (pc.iceConnectionState === 'failed') {
+                console.error('ICE connection failed, retrying...');
+                pc.restartIce();
+            }
+        };
+        
+        // 监听远程流（标准方式）
+        pc.ontrack = (event) => {
+            console.log('Remote track received:', event.track.kind);
+            
+            if (!this.remoteStream) {
+                this.remoteStream = new MediaStream();
+            }
+            
+            // 检查轨道是否已存在
+            const existingTracks = this.remoteStream.getTracks();
+            const trackExists = existingTracks.some(t => t.kind === event.track.kind);
+            
+            if (!trackExists) {
+                this.remoteStream.addTrack(event.track);
+                console.log('Added track:', event.track.kind);
+            }
+            
+            // 只收集轨道，不在这里播放，等待连接稳定
+            console.log('Remote stream tracks collected, waiting for connection...');
+        };
+        
+        // 备选方式：监听addstream事件（旧浏览器兼容）
+        pc.onaddstream = (event) => {
+            console.log('onaddstream triggered');
+            if (!this.remoteStream) {
+                this.remoteStream = event.stream;
+            }
+            // 不在这里播放，等待连接状态变化
+        };
+        
+        // 监听连接状态变化
+        pc.onconnectionstatechange = () => {
+            console.log('Connection state:', pc.connectionState);
+            if (pc.connectionState === 'connected' || pc.connectionState === 'completed') {
+                console.log('WebRTC connection established!');
+                // 连接成功后，延迟一点时间确保稳定，然后播放
+                if (this.remoteStream && !this.remoteStreamPlaying) {
+                    this.remoteStreamPlaying = true;
+                    setTimeout(() => {
+                        if (this.remoteStreamPlaying && this.remoteStream) {
+                            this.playRemoteAudio();
+                        }
+                    }, 500);
+                }
+            }
+            if (pc.connectionState === 'disconnected') {
+                this.endCall();
+            }
+            if (pc.connectionState === 'failed') {
+                console.error('WebRTC connection failed!');
+                // 连接失败，显示错误提示
+                this.showCallError('连接失败，请检查网络连接');
+                this.endCall();
+            }
+        };
+        
+        // 监听信令状态变化
+        pc.onsignalingstatechange = () => {
+            console.log('Signaling state:', pc.signalingState);
+        };
+        
+        return pc;
+    }
+    
+    handleIncomingCall(data) {
+        if (this.isInCall) {
+            this.socket.emit('call-reject', { targetId: data.from });
+            return;
+        }
+        
+        this.currentCallTarget = this.friends.find(f => f.id === data.from);
+        
+        if (!this.currentCallTarget) {
+            return;
+        }
+        
+        this.isInCall = true;
+        
+        // 显示来电界面
+        this.showCallModal('incoming', data.fromUsername);
+        
+        // 创建PeerConnection
+        this.peerConnection = this.createPeerConnection();
+        
+        // 设置远程描述
+        this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
+            .then(() => {
+                console.log('Remote description set successfully');
+                // 设置远程描述后，需要创建接收器来接收远程流
+                this.peerConnection.getReceivers().forEach(receiver => {
+                    console.log('Receiver:', receiver.track?.kind);
+                });
+            })
+            .catch(err => {
+                console.error('Failed to set remote description:', err);
+            });
+    }
+    
+    async acceptCall() {
+        try {
+            // 获取本地媒体流（视频+音频）
+            this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            
+            // 确保音频上下文被激活
+            if (window.AudioContext || window.webkitAudioContext) {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                await audioContext.resume();
+            }
+            
+            // 添加本地流
+            this.localStream.getTracks().forEach(track => {
+                this.peerConnection.addTrack(track, this.localStream);
+            });
+            
+            // 创建Answer
+            const answer = await this.peerConnection.createAnswer();
+            await this.peerConnection.setLocalDescription(answer);
+            
+            // 更新界面为通话中
+            this.updateCallModal('connected');
+            
+            // 显示本地视频
+            this.showLocalVideo();
+            
+            // 发送应答
+            this.socket.emit('answer', {
+                targetId: this.currentCallTarget.id,
+                answer: answer
+            });
+        } catch (error) {
+            console.error('Failed to accept call:', error);
+            this.rejectCall();
+        }
+    }
+    
+    rejectCall() {
+        this.socket.emit('call-reject', { targetId: this.currentCallTarget.id });
+        this.endCall();
+    }
+    
+    handleAnswer(data) {
+        this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        this.updateCallModal('connected');
+    }
+    
+    handleIceCandidate(data) {
+        if (data.candidate && this.peerConnection) {
+            this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        }
+    }
+    
+    handleCallEnd(data) {
+        this.endCall();
+    }
+    
+    handleCallReject(data) {
+        alert('对方拒绝了通话');
+        this.endCall();
+    }
+    
+    endCall() {
+        this.isInCall = false;
+        this.remoteStreamPlaying = false;
+        this.isVideoPlaying = false;
+        
+        // 关闭本地流
+        if (this.localStream) {
+            this.localStream.getTracks().forEach(track => track.stop());
+            this.localStream = null;
+        }
+        
+        // 关闭远程流
+        if (this.remoteStream) {
+            this.remoteStream.getTracks().forEach(track => track.stop());
+            this.remoteStream = null;
+        }
+        
+        // 关闭PeerConnection
+        if (this.peerConnection) {
+            this.peerConnection.close();
+            this.peerConnection = null;
+        }
+        
+        // 关闭音频元素
+        const remoteAudio = document.getElementById('remote-audio');
+        if (remoteAudio) {
+            remoteAudio.pause();
+            remoteAudio.srcObject = null;
+        }
+        
+        // 关闭视频元素
+        const remoteVideo = document.getElementById('remote-video');
+        if (remoteVideo) {
+            remoteVideo.pause();
+            remoteVideo.srcObject = null;
+        }
+        
+        const localVideo = document.getElementById('local-video');
+        if (localVideo) {
+            localVideo.pause();
+            localVideo.srcObject = null;
+        }
+        
+        // 发送结束通知
+        if (this.currentCallTarget) {
+            this.socket.emit('call-end', { targetId: this.currentCallTarget.id });
+            this.currentCallTarget = null;
+        }
+        
+        // 关闭通话界面
+        const callModal = document.getElementById('call-modal');
+        if (callModal) {
+            document.body.removeChild(callModal);
+        }
+    }
+    
+    showCallModal(type, callerName = '') {
+        const callModal = document.createElement('div');
+        callModal.id = 'call-modal';
+        callModal.className = 'call-modal';
+        
+        const friend = this.currentCallTarget;
+        const name = type === 'incoming' ? callerName : friend.username;
+        
+        let actionsHTML = '';
+        if (type === 'incoming') {
+            actionsHTML = `
+                <button class="call-btn call-btn-secondary" id="reject-call-btn">✕ 拒绝</button>
+                <button class="call-btn call-btn-primary" id="accept-call-btn">✓ 接听</button>
+            `;
+        } else if (type === 'outgoing') {
+            actionsHTML = `
+                <button class="call-btn call-btn-danger" id="end-call-btn">✕ 取消</button>
+            `;
+        }
+        
+        callModal.innerHTML = `
+            <div class="call-modal-content">
+                <div class="call-video-container">
+                    <video id="remote-video" autoplay playsinline style="width: 100%; height: 200px; background: #000; border-radius: 12px;"></video>
+                    <video id="local-video" autoplay playsinline muted style="width: 80px; height: 80px; background: #333; border-radius: 8px; position: absolute; bottom: 10px; right: 10px; object-fit: cover;"></video>
+                </div>
+                <div class="call-info">
+                    <div class="call-avatar">${name.charAt(0).toUpperCase()}</div>
+                    <div class="call-name">${name}</div>
+                    <div class="call-status" id="call-status">${type === 'incoming' ? '视频来电中...' : '正在视频呼叫...'}</div>
+                </div>
+                <audio id="remote-audio" autoplay playsinline controls style="display: none;"></audio>
+                <div class="call-actions">${actionsHTML}</div>
+            </div>
+        `;
+        
+        document.body.appendChild(callModal);
+        callModal.style.display = 'flex';
+        
+        if (type === 'incoming') {
+            const acceptBtn = callModal.querySelector('#accept-call-btn');
+            const rejectBtn = callModal.querySelector('#reject-call-btn');
+            if (acceptBtn) {
+                acceptBtn.addEventListener('click', () => this.acceptCall());
+            }
+            if (rejectBtn) {
+                rejectBtn.addEventListener('click', () => this.rejectCall());
+            }
+        } else {
+            const endBtn = callModal.querySelector('#end-call-btn');
+            if (endBtn) {
+                endBtn.addEventListener('click', () => this.endCall());
+            }
+        }
+    }
+    
+    updateCallModal(status) {
+        const callModal = document.getElementById('call-modal');
+        if (!callModal) return;
+        
+        const statusEl = document.getElementById('call-status');
+        if (statusEl) {
+            statusEl.textContent = '通话中...';
+        }
+        
+        const actionsEl = callModal.querySelector('.call-actions');
+        if (actionsEl) {
+            actionsEl.innerHTML = `
+                <button class="call-btn call-btn-danger" id="end-call-btn">✕ 结束通话</button>
+            `;
+            document.getElementById('end-call-btn').addEventListener('click', () => this.endCall());
+        }
+    }
+    
+    playRemoteAudio() {
+        const remoteAudio = document.getElementById('remote-audio');
+        const remoteVideo = document.getElementById('remote-video');
+        
+        console.log('playRemoteAudio called, remoteStream:', this.remoteStream);
+        
+        if (!this.remoteStream) {
+            console.log('remoteStream is null');
+            return;
+        }
+        
+        console.log('Remote stream tracks:', this.remoteStream.getTracks().map(t => t.kind));
+        
+        // 先设置视频元素，再标记
+        if (remoteVideo) {
+            remoteVideo.srcObject = this.remoteStream;
+            remoteVideo.autoplay = true;
+            remoteVideo.playsinline = true;
+            remoteVideo.muted = false;
+            
+            // 尝试播放
+            remoteVideo.play().then(() => {
+                console.log('Video playing successfully');
+            }).catch(e => {
+                console.warn('Video play issue:', e);
+            });
+        }
+        
+        // 设置音频元素
+        if (remoteAudio) {
+            remoteAudio.srcObject = this.remoteStream;
+            remoteAudio.muted = false;
+            remoteAudio.volume = 1;
+            remoteAudio.play().catch(e => console.warn('Audio play issue:', e));
+        }
+        
+        // 最后标记为正在播放
+        this.remoteStreamPlaying = true;
+        this.isVideoPlaying = true;
+    }
+    
+    setupVideoPlayOnInteraction(videoElement) {
+        const callModal = document.getElementById('call-modal');
+        if (callModal && videoElement) {
+            const handleClick = () => {
+                videoElement.play().then(() => {
+                    console.log('Video playing after user interaction');
+                }).catch(e => {
+                    console.error('Still failed to play video:', e);
+                });
+                callModal.removeEventListener('click', handleClick);
+            };
+            callModal.addEventListener('click', handleClick);
+        }
+    }
+    
+    showCallError(message) {
+        const callModal = document.getElementById('call-modal');
+        if (callModal) {
+            const statusEl = callModal.querySelector('#call-status');
+            if (statusEl) {
+                statusEl.textContent = message;
+                statusEl.style.color = '#ff4757';
+            }
+        }
+    }
+    
+    showLocalVideo() {
+        const localVideo = document.getElementById('local-video');
+        if (localVideo && this.localStream) {
+            localVideo.srcObject = this.localStream;
+            localVideo.play().catch(e => console.error('Failed to play local video:', e));
+        }
     }
 
     toggleContactsPlusMenu() {
@@ -193,21 +742,7 @@ class ChatApp {
         }
     }
 
-    toggleDiscoverPlusMenu() {
-        const menu = document.getElementById('discover-plus-menu');
-        const isVisible = menu.classList.contains('visible');
-        if (isVisible) {
-            menu.classList.remove('visible');
-            setTimeout(() => {
-                menu.style.display = 'none';
-            }, 150);
-        } else {
-            menu.style.display = 'block';
-            setTimeout(() => {
-                menu.classList.add('visible');
-            }, 10);
-        }
-    }
+
 
     async createGroup() {
         const groupNumber = document.getElementById('group-number-input').value.trim();
@@ -886,10 +1421,24 @@ class ChatApp {
         });
         document.getElementById('avatar-upload-input').addEventListener('change', (e) => this.handleAvatarUpload(e));
 
-        document.getElementById('image-btn').addEventListener('click', () => {
-            document.getElementById('image-upload-input').click();
+        document.getElementById('plus-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.togglePlusMenu();
         });
+        
+        document.getElementById('plus-menu-album').addEventListener('click', () => {
+            document.getElementById('image-upload-input').click();
+            this.closePlusMenu();
+        });
+        
+        document.getElementById('plus-menu-call').addEventListener('click', () => {
+            this.initiateCall();
+            this.closePlusMenu();
+        });
+        
         document.getElementById('image-upload-input').addEventListener('change', (e) => this.handleImageUpload(e));
+        
+        document.addEventListener('click', () => this.closePlusMenu());
 
         document.getElementById('change-password-btn').addEventListener('click', () => this.showChangePasswordModal());
         document.getElementById('close-password-modal-btn').addEventListener('click', () => this.closeChangePasswordModal());
@@ -1053,6 +1602,9 @@ class ChatApp {
                 this.startPolling();
                 this.startPasswordVersionCheck();
             }, 0);
+            
+            // 登录socket
+            this.loginSocket();
         } else {
             this.setButtonLoading('login-form-submit-btn', false);
             document.getElementById('login-error').textContent = result.message || '登录失败';
@@ -1746,6 +2298,7 @@ class ChatApp {
     }
 
     async send() {
+        this.closePlusMenu();
         const input = document.getElementById('message-input');
         const content = input.value.trim();
         if (!content) return;
@@ -2033,6 +2586,7 @@ class ChatApp {
             discover: '发现',
             me: '个人',
             shareApp: '分享应用',
+            adminPanel: '后台管理',
             darkMode: '深色模式',
             language: '中文/English',
             updateLog: '更新日志',
@@ -2059,7 +2613,11 @@ class ChatApp {
             createGroup: '创建群聊',
             startGroupChat: '发起群聊',
             myGroups: '我的群聊',
-            friendsList: '好友列表'
+            friendsList: '好友列表',
+            tellIntro: 'Tell官方介绍',
+            tellAnnouncement: 'Tell官方公告',
+            contactDeveloper: '联系开发者',
+            otherProjects: '其他项目'
         },
         en: {
             login: 'Login',
@@ -2073,8 +2631,9 @@ class ChatApp {
             discover: 'Discover',
             me: 'Me',
             shareApp: 'Share App',
+            adminPanel: 'Admin Panel',
             darkMode: 'Dark Mode',
-            language: 'Chinese Mode',
+            language: 'English Mode',
             updateLog: 'Update Log',
             changeAccount: 'Change Account',
             changeAvatar: 'Change Avatar',
@@ -2099,7 +2658,11 @@ class ChatApp {
             createGroup: 'Create Group',
             startGroupChat: 'Start Group Chat',
             myGroups: 'My Groups',
-            friendsList: 'Friends List'
+            friendsList: 'Friends List',
+            tellIntro: 'Tell Official Intro',
+            tellAnnouncement: 'Tell Announcement',
+            contactDeveloper: 'Contact Developer',
+            otherProjects: 'Other Projects'
         }
     }
 
@@ -2159,7 +2722,7 @@ class ChatApp {
         // 加号菜单 - 发起群聊
         document.querySelector('#create-group-menu-item span:last-child').textContent = t.startGroupChat;
         document.querySelector('#contacts-create-group-menu-item span:last-child').textContent = t.startGroupChat;
-        document.querySelector('#discover-create-group-menu-item span:last-child').textContent = t.startGroupChat;
+
 
         // 通讯录分组标题
         const groupSectionTitle = document.querySelector('#contacts-groups-section .contacts-section-title');
@@ -2173,24 +2736,25 @@ class ChatApp {
 
         // 发现页
         document.querySelector('#share-app-btn span:nth-child(2)').textContent = t.shareApp;
-        document.querySelector('#toggle-theme-btn span:nth-child(2)').textContent = t.darkMode;
-
-        const langLabel = document.querySelector('#lang-toggle-label');
-        if (langLabel) {
-            langLabel.textContent = t.language;
-        }
+        document.querySelector('#admin-panel-btn span:nth-child(2)').textContent = t.adminPanel;
+        document.querySelector('#tell-intro-btn span:nth-child(2)').textContent = t.tellIntro;
+        document.querySelector('#tell-announcement-btn span:nth-child(2)').textContent = t.tellAnnouncement;
+        document.querySelector('#contact-developer-btn span:nth-child(2)').textContent = t.contactDeveloper;
+        document.querySelector('#other-projects-btn span:nth-child(2)').textContent = t.otherProjects;
 
         // 更新日志
         const updateTitle = document.querySelector('#update-header h3');
         if (updateTitle) {
-            updateTitle.textContent = t.updateLog + ' v5.1.0';
+            updateTitle.textContent = t.updateLog;
         }
 
         // 个人页
-        document.querySelector('#change-username-btn span:first-child').textContent = t.changeAccount;
-        document.querySelector('#upload-avatar-btn span:first-child').textContent = t.changeAvatar;
-        document.querySelector('#change-password-btn span:first-child').textContent = t.changePassword;
-        document.querySelector('#logout-btn span:first-child').textContent = t.logout;
+        document.querySelector('#change-username-btn .settings-item-left span').textContent = t.changeAccount;
+        document.querySelector('#upload-avatar-btn .settings-item-left span').textContent = t.changeAvatar;
+        document.querySelector('#change-password-btn .settings-item-left span').textContent = t.changePassword;
+        document.querySelector('#toggle-theme-btn .settings-item-left span').textContent = t.darkMode;
+        document.querySelector('#toggle-lang-btn .settings-item-left span').textContent = t.language;
+        document.querySelector('#logout-btn .settings-item-left span').textContent = t.logout;
 
         // 修改密码弹窗
         document.querySelector('#change-password-modal h3').textContent = t.changePasswordTitle;
@@ -2216,11 +2780,11 @@ class ChatApp {
         }
 
         // 页脚
-        document.querySelector('.footer-info p:first-child').textContent = 'Tell v5.1.0';
+        document.querySelector('.footer-info p:first-child').textContent = 'Tell v5.9.3';
         document.querySelector('.copyright').textContent = t.copyright;
 
         // 版本信息
-        document.querySelector('.version-info span:first-child').textContent = 'v5.1.0';
+        document.querySelector('.version-info span:first-child').textContent = 'v5.9.3';
 
         // 聊天输入框
         document.getElementById('message-input').placeholder = this.currentLang === 'zh' ? '输入消息...' : 'Type a message...';

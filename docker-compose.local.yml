@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn-local
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "5349:5349"
+      - "5349:5349/udp"
+    restart: unless-stopped
+    command: >
+      -n
+      --listening-port=3478
+      --tls-listening-port=5349
+      --external-ip=0.0.0.0
+      --realm=localhost
+      --user=test:test123
+      --min-port=49152
+      --max-port=65535
+      --verbose
+      --log-file=/var/log/coturn.log
+    volumes:
+      - ./coturn/logs:/var/log
+    environment:
+      - TZ=Asia/Shanghai
