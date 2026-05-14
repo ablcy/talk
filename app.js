@@ -1,4 +1,4 @@
-const APP_VERSION = typeof VERSION !== 'undefined' ? VERSION.toString() : 'v5.9.16';
+const APP_VERSION = typeof VERSION !== 'undefined' ? VERSION.toString() : 'v5.9.17';
 
 class ChatApp {
     constructor() {
@@ -1635,6 +1635,8 @@ class ChatApp {
         this.setButtonLoading('login-form-submit-btn', true);
         document.getElementById('login-error').textContent = '';
 
+        const startTime = performance.now();
+
         const result = await this.fetchData('/api/login', {
             method: 'POST',
             body: JSON.stringify({ username, password })
@@ -1643,49 +1645,54 @@ class ChatApp {
         if (result.success) {
             this.currentUser = result.user;
             
-            // 优化：延迟写入localStorage，不阻塞主线程
-            this.deferredSaveToStorage('currentUser', JSON.stringify(result.user));
+            // 极致优化：使用queueMicrotask延迟写入localStorage，不阻塞主线程
+            queueMicrotask(() => {
+                try {
+                    localStorage.setItem('currentUser', JSON.stringify(result.user));
+                } catch (e) {
+                    this.cleanupLocalStorage();
+                }
+            });
 
-            if (result.friends) {
-                this.friends = result.friends;
-                this.deferredSaveToStorage('cachedFriends', JSON.stringify(result.friends));
-            }
-            if (result.groups) {
-                this.groups = result.groups;
-                this.deferredSaveToStorage('cachedGroups', JSON.stringify(result.groups));
-            }
+            if (result.friends) this.friends = result.friends;
+            if (result.groups) this.groups = result.groups;
 
-            // 立即切换界面（关键优化：先显示，再渲染内容）
-            document.getElementById('auth-screen').style.display = 'none';
-            document.getElementById('main-screen').style.display = 'flex';
+            // 立即切换界面（关键优化：先显示，再渲染内容）- 最快路径
+            const authScreen = document.getElementById('auth-screen');
+            const mainScreen = document.getElementById('main-screen');
+            authScreen.style.display = 'none';
+            mainScreen.style.display = 'flex';
             
             // 最小化同步操作：只更新用户名，头像用首字母占位
             this.updateProfileSkeleton();
 
-            // 极致优化：使用微任务异步渲染
-            queueMicrotask(() => {
+            // 极致优化：使用requestAnimationFrame确保在浏览器空闲时渲染
+            requestAnimationFrame(() => {
                 this.renderChatListUltraFast();
-                queueMicrotask(() => {
+                requestAnimationFrame(() => {
                     this.renderContactsUltraFast();
                     this.setButtonLoading('login-form-submit-btn', false);
                     
-                    // 后台懒加载头像
+                    // 后台懒加载头像（非阻塞）
                     setTimeout(() => {
                         this.lazyLoadAvatars();
-                    }, 100);
+                    }, 50);
                 });
             });
 
             // 延迟加载消息和socket（非关键路径）
             setTimeout(() => {
                 this.loadMessages();
-            }, 500);
+            }, 300);
             
             setTimeout(() => {
                 this.startPolling();
                 this.startPasswordVersionCheck();
                 this.loginSocket();
-            }, 1000);
+            }, 800);
+
+            const endTime = performance.now();
+            console.log(`Login completed in ${(endTime - startTime).toFixed(2)}ms`);
         } else {
             this.setButtonLoading('login-form-submit-btn', false);
             document.getElementById('login-error').textContent = result.message || '登录失败';
