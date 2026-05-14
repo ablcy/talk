@@ -244,37 +244,50 @@ class ChatApp {
             alert('请先选择一个好友');
             return;
         }
-        
+
         if (this.isInCall) {
             alert('您正在通话中');
             return;
         }
-        
+
         this.currentCallTarget = this.currentFriend;
         this.isInCall = true;
-        
+
         try {
+            // 检查浏览器是否支持 mediaDevices
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('您的浏览器不支持视频通话功能');
+            }
+
+            // 先检查权限状态
+            const permissionStatus = await navigator.permissions.query({ name: 'camera' }).catch(() => ({ state: 'prompt' }));
+            const audioPermissionStatus = await navigator.permissions.query({ name: 'microphone' }).catch(() => ({ state: 'prompt' }));
+
+            if (permissionStatus.state === 'denied' || audioPermissionStatus.state === 'denied') {
+                throw new Error('摄像头或麦克风权限被拒绝，请在浏览器设置中开启权限后重试');
+            }
+
             // 获取本地媒体流（视频+音频）
             this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            
+
             // 创建PeerConnection
             this.peerConnection = this.createPeerConnection();
-            
+
             // 添加本地流到PeerConnection
             this.localStream.getTracks().forEach(track => {
                 this.peerConnection.addTrack(track, this.localStream);
             });
-            
+
             // 创建Offer
             const offer = await this.peerConnection.createOffer();
             await this.peerConnection.setLocalDescription(offer);
-            
+
             // 显示呼叫界面
             this.showCallModal('outgoing');
-            
+
             // 显示本地视频
             this.showLocalVideo();
-            
+
             // 发送呼叫请求
             this.socket.emit('call', {
                 targetId: this.currentFriend.id,
@@ -283,7 +296,19 @@ class ChatApp {
             });
         } catch (error) {
             console.error('Failed to initiate call:', error);
-            alert('无法发起通话，请检查麦克风权限');
+            let errorMessage = '无法发起通话，请检查麦克风和摄像头权限。\n\n解决方法：\n1. 点击浏览器地址栏左侧的摄像头/麦克风图标\n2. 允许访问摄像头和麦克风\n3. 如果没有图标，请在浏览器设置中开启权限';
+
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                errorMessage = '摄像头或麦克风权限被拒绝。\n\n请按以下步骤开启权限：\n1. 点击浏览器地址栏左侧的锁图标或摄像头图标\n2. 选择"允许"摄像头和麦克风\n3. 重新点击视频通话按钮';
+            } else if (error.name === 'NotFoundError') {
+                errorMessage = '未找到摄像头或麦克风设备。\n\n请确认您的设备已正确连接摄像头和麦克风。';
+            } else if (error.name === 'NotReadableError') {
+                errorMessage = '摄像头或麦克风被其他应用占用。\n\n请关闭其他使用摄像头的应用后重试。';
+            } else if (error.message && error.message.includes('您的浏览器不支持')) {
+                errorMessage = error.message;
+            }
+
+            alert(errorMessage);
             this.endCall();
         }
     }
@@ -461,30 +486,43 @@ class ChatApp {
     
     async acceptCall() {
         try {
+            // 检查浏览器是否支持 mediaDevices
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('您的浏览器不支持视频通话功能');
+            }
+
+            // 先检查权限状态
+            const permissionStatus = await navigator.permissions.query({ name: 'camera' }).catch(() => ({ state: 'prompt' }));
+            const audioPermissionStatus = await navigator.permissions.query({ name: 'microphone' }).catch(() => ({ state: 'prompt' }));
+
+            if (permissionStatus.state === 'denied' || audioPermissionStatus.state === 'denied') {
+                throw new Error('摄像头或麦克风权限被拒绝，请在浏览器设置中开启权限后重试');
+            }
+
             // 获取本地媒体流（视频+音频）
             this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            
+
             // 确保音频上下文被激活
             if (window.AudioContext || window.webkitAudioContext) {
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 await audioContext.resume();
             }
-            
+
             // 添加本地流
             this.localStream.getTracks().forEach(track => {
                 this.peerConnection.addTrack(track, this.localStream);
             });
-            
+
             // 创建Answer
             const answer = await this.peerConnection.createAnswer();
             await this.peerConnection.setLocalDescription(answer);
-            
+
             // 更新界面为通话中
             this.updateCallModal('connected');
-            
+
             // 显示本地视频
             this.showLocalVideo();
-            
+
             // 发送应答
             this.socket.emit('answer', {
                 targetId: this.currentCallTarget.id,
@@ -492,6 +530,19 @@ class ChatApp {
             });
         } catch (error) {
             console.error('Failed to accept call:', error);
+            let errorMessage = '无法接听通话，请检查麦克风和摄像头权限。\n\n解决方法：\n1. 点击浏览器地址栏左侧的摄像头/麦克风图标\n2. 允许访问摄像头和麦克风\n3. 如果没有图标，请在浏览器设置中开启权限';
+
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                errorMessage = '摄像头或麦克风权限被拒绝。\n\n请按以下步骤开启权限：\n1. 点击浏览器地址栏左侧的锁图标或摄像头图标\n2. 选择"允许"摄像头和麦克风\n3. 重新点击接听按钮';
+            } else if (error.name === 'NotFoundError') {
+                errorMessage = '未找到摄像头或麦克风设备。\n\n请确认您的设备已正确连接摄像头和麦克风。';
+            } else if (error.name === 'NotReadableError') {
+                errorMessage = '摄像头或麦克风被其他应用占用。\n\n请关闭其他使用摄像头的应用后重试。';
+            } else if (error.message && error.message.includes('您的浏览器不支持')) {
+                errorMessage = error.message;
+            }
+
+            alert(errorMessage);
             this.rejectCall();
         }
     }
@@ -3125,7 +3176,7 @@ class ChatApp {
         document.querySelector('.copyright').textContent = t.copyright;
 
         // 版本信息
-        document.querySelector('.version-info span:first-child').textContent = 'v5.9.8';
+        document.querySelector('.version-info span:first-child').textContent = 'v5.9.10';
 
         // 聊天输入框
         document.getElementById('message-input').placeholder = this.currentLang === 'zh' ? '输入消息...' : 'Type a message...';
