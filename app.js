@@ -1,4 +1,4 @@
-const APP_VERSION = typeof VERSION !== 'undefined' ? VERSION.toString() : 'v5.9.17';
+const APP_VERSION = typeof VERSION !== 'undefined' ? VERSION.toString() : 'v5.9.18';
 
 class ChatApp {
     constructor() {

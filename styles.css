@@ -358,6 +358,7 @@ form button[type="submit"]:hover {
 .chat-list,
 .contacts-list {
     padding: 0;
+    padding-bottom: 70px;
 }
 
 .chat-item {
