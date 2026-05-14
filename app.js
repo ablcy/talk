@@ -1701,8 +1701,42 @@ class ChatApp {
                 localStorage.setItem(key, value);
             } catch (e) {
                 console.warn('LocalStorage save failed:', e);
+                // 如果是配额错误，尝试清理旧数据
+                if (e.name === 'QuotaExceededError') {
+                    this.cleanupLocalStorage();
+                    // 重试一次
+                    try {
+                        localStorage.setItem(key, value);
+                    } catch (e2) {
+                        console.warn('Retry failed:', e2);
+                    }
+                }
             }
         }, 0);
+    }
+
+    cleanupLocalStorage() {
+        // 清理旧消息数据（保留最近的消息）
+        try {
+            const keysToKeep = ['currentUser', 'cachedFriends', 'cachedGroups'];
+            const allKeys = Object.keys(localStorage);
+            
+            for (const key of allKeys) {
+                if (!keysToKeep.includes(key)) {
+                    try {
+                        // 检查是否是旧消息数据
+                        if (key.startsWith('messages-') || key.startsWith('groupMessages-')) {
+                            // 可以考虑保留部分消息或直接删除旧数据
+                            localStorage.removeItem(key);
+                        }
+                    } catch (e) {
+                        console.warn('Failed to remove key:', key, e);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Cleanup failed:', e);
+        }
     }
 
     updateProfileSkeleton() {
@@ -2009,15 +2043,21 @@ class ChatApp {
             content.classList.remove('active');
         });
 
-        document.getElementById(`tab-${tab}`).classList.add('active');
+        const tabContent = document.getElementById(`tab-${tab}`);
+        if (tabContent) {
+            tabContent.classList.add('active');
+        }
 
-        const titles = {
-            chats: 'Tell',
-            contacts: '通讯录',
-            discover: '发现',
-            me: '我'
-        };
-        document.getElementById('page-title').textContent = titles[tab] || 'Tell';
+        const pageTitle = document.getElementById('page-title');
+        if (pageTitle) {
+            const titles = {
+                chats: 'Tell',
+                contacts: '通讯录',
+                discover: '发现',
+                me: '我'
+            };
+            pageTitle.textContent = titles[tab] || 'Tell';
+        }
 
         if (tab === 'chats') {
             this.renderChatList();
@@ -3172,11 +3212,11 @@ class ChatApp {
         }
 
         // 页脚
-        document.querySelector('.footer-info p:first-child').textContent = 'Tell v5.9.9';
+        document.querySelector('.footer-info p:first-child').textContent = 'Tell v5.9.11';
         document.querySelector('.copyright').textContent = t.copyright;
 
         // 版本信息
-        document.querySelector('.version-info span:first-child').textContent = 'v5.9.10';
+        document.querySelector('.version-info span:first-child').textContent = 'v5.9.11';
 
         // 聊天输入框
         document.getElementById('message-input').placeholder = this.currentLang === 'zh' ? '输入消息...' : 'Type a message...';
