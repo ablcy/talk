@@ -346,7 +346,273 @@ async function initDB() {
 
 initDB().then(() => {
   initAdminPassword();
+  initAIAgent();
 });
+
+let AI_AGENT_ID = null;
+const AI_AGENT_USERNAME = 'AI助手';
+const AI_AGENT_NICKNAME = 'AI智能助手';
+let AI_API_KEY = process.env.AI_API_KEY || 'de2da1e5f1f24c54b645051fbe551e32.OdKI3urA59V4evNo';
+
+async function initAIAgent() {
+  try {
+    let aiUser;
+    if (DATABASE_URL) {
+      aiUser = await usersDB.query('SELECT id FROM users WHERE username = $1', [AI_AGENT_USERNAME]);
+    } else {
+      aiUser = await promisifyDB(usersDB.find).call(usersDB, { username: AI_AGENT_USERNAME });
+    }
+
+    const aiUserData = DATABASE_URL ? aiUser.rows[0] : aiUser[0];
+
+    if (!aiUserData) {
+      const hashedPassword = await bcrypt.hash('aiagent123', SALT_ROUNDS);
+      const aiId = uuidv4();
+
+      if (DATABASE_URL) {
+        await usersDB.query(
+          'INSERT INTO users (id, username, password, avatar, nickname) VALUES ($1, $2, $3, $4, $5)',
+          [aiId, AI_AGENT_USERNAME, hashedPassword, null, AI_AGENT_NICKNAME]
+        );
+      } else {
+        await promisifyDB(usersDB.insert).call(usersDB, {
+          _id: aiId,
+          id: aiId,
+          username: AI_AGENT_USERNAME,
+          password: hashedPassword,
+          avatar: null,
+          nickname: AI_AGENT_NICKNAME,
+          created_at: new Date().toISOString()
+        });
+      }
+
+      AI_AGENT_ID = aiId;
+      console.log('AI Agent created successfully');
+    } else {
+      AI_AGENT_ID = aiUserData.id;
+      console.log('AI Agent loaded');
+    }
+
+    await addAIAgentToAllUsers();
+  } catch (error) {
+    console.error('Init AI Agent error:', error);
+  }
+}
+
+async function addAIAgentToAllUsers() {
+  if (!AI_AGENT_ID) return;
+
+  try {
+    let allUsers;
+    if (DATABASE_URL) {
+      allUsers = await usersDB.query('SELECT id, username FROM users WHERE id != $1', [AI_AGENT_ID]);
+      allUsers = allUsers.rows;
+    } else {
+      allUsers = await promisifyDB(usersDB.find).call(usersDB, { id: { $ne: AI_AGENT_ID } });
+    }
+
+    for (const user of allUsers) {
+      await addAIAgentAsFriend(user.id, user.username, true);
+    }
+  } catch (error) {
+    console.error('Add AI Agent to all users error:', error);
+  }
+}
+
+async function addAIAgentAsFriend(userId, username, skipMessage = false) {
+  if (!AI_AGENT_ID) return;
+
+  try {
+    if (DATABASE_URL) {
+      const existFriendship = await friendshipsDB.query(
+        'SELECT id FROM friendships WHERE user_id = $1 AND friend_id = $2',
+        [userId, AI_AGENT_ID]
+      );
+
+      if (existFriendship.rows.length === 0) {
+        await friendshipsDB.query(
+          'INSERT INTO friendships (user_id, friend_id) VALUES ($1, $2), ($3, $4)',
+          [userId, AI_AGENT_ID, AI_AGENT_ID, userId]
+        );
+
+        if (!skipMessage) {
+          await sendAIIntroduction(userId);
+        }
+      }
+    } else {
+      const existFriendship = await promisifyDB(friendshipsDB.find).call(friendshipsDB, {
+        user_id: userId,
+        friend_id: AI_AGENT_ID
+      });
+
+      if (existFriendship.length === 0) {
+        await promisifyDB(friendshipsDB.insert).call(friendshipsDB, {
+          user_id: userId,
+          friend_id: AI_AGENT_ID
+        });
+        await promisifyDB(friendshipsDB.insert).call(friendshipsDB, {
+          user_id: AI_AGENT_ID,
+          friend_id: userId
+        });
+
+        if (!skipMessage) {
+          await sendAIIntroduction(userId);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Add AI Agent as friend error:', error);
+  }
+}
+
+async function sendAIIntroduction(userId) {
+  if (!AI_AGENT_ID) return;
+
+  const now = new Date();
+  const beijingTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+  const year = beijingTime.getUTCFullYear();
+  const month = String(beijingTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(beijingTime.getUTCDate()).padStart(2, '0');
+  const hours = String(beijingTime.getUTCHours()).padStart(2, '0');
+  const minutes = String(beijingTime.getUTCMinutes()).padStart(2, '0');
+  const formattedTime = `${year}/${month}/${day} ${hours}:${minutes}`;
+
+  const messageId = uuidv4();
+  const introduction = '你好！我是AI智能助手，很高兴认识你！我可以帮你回答问题、聊天解闷。有什么需要帮助的，随时告诉我哦～';
+
+  if (DATABASE_URL) {
+    await messagesDB.query(
+      `INSERT INTO messages (id, sender_id, receiver_id, content, type, time, timestamp, read)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [messageId, AI_AGENT_ID, userId, introduction, 'text', formattedTime, Date.now(), false]
+    );
+  } else {
+    await promisifyDB(messagesDB.insert).call(messagesDB, {
+      _id: messageId,
+      id: messageId,
+      sender_id: AI_AGENT_ID,
+      receiver_id: userId,
+      content: introduction,
+      type: 'text',
+      time: formattedTime,
+      timestamp: Date.now(),
+      read: false
+    });
+  }
+}
+
+async function handleAIMessage(userId, userContent) {
+  if (!AI_AGENT_ID) return;
+
+  try {
+    let aiResponse = '';
+
+    if (AI_API_KEY && AI_API_KEY.includes('.')) {
+      aiResponse = await callZhipuAPI(userContent);
+    } else {
+      aiResponse = getSimpleResponse(userContent);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const now = new Date();
+    const beijingTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+    const year = beijingTime.getUTCFullYear();
+    const month = String(beijingTime.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(beijingTime.getUTCDate()).padStart(2, '0');
+    const hours = String(beijingTime.getUTCHours()).padStart(2, '0');
+    const minutes = String(beijingTime.getUTCMinutes()).padStart(2, '0');
+    const formattedTime = `${year}/${month}/${day} ${hours}:${minutes}`;
+
+    const messageId = uuidv4();
+
+    if (DATABASE_URL) {
+      await messagesDB.query(
+        `INSERT INTO messages (id, sender_id, receiver_id, content, type, time, timestamp, read)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [messageId, AI_AGENT_ID, userId, aiResponse, 'text', formattedTime, Date.now(), false]
+      );
+    } else {
+      await promisifyDB(messagesDB.insert).call(messagesDB, {
+        _id: messageId,
+        id: messageId,
+        sender_id: AI_AGENT_ID,
+        receiver_id: userId,
+        content: aiResponse,
+        type: 'text',
+        time: formattedTime,
+        timestamp: Date.now(),
+        read: false
+      });
+    }
+  } catch (error) {
+    console.error('Handle AI message error:', error);
+  }
+}
+
+function getSimpleResponse(userContent) {
+  const lowerContent = userContent.toLowerCase();
+
+  if (lowerContent.includes('你好') || lowerContent.includes('哈喽') || lowerContent.includes('hi')) {
+    return '你好呀！很高兴和你聊天～';
+  } else if (lowerContent.includes('帮助') || lowerContent.includes('帮忙') || lowerContent.includes('怎么')) {
+    return '我可以帮你回答问题、聊天解闷。有什么想聊的，随时告诉我哦！';
+  } else if (lowerContent.includes('时间') || lowerContent.includes('几点')) {
+    const now = new Date();
+    const beijingTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+    const hours = String(beijingTime.getUTCHours()).padStart(2, '0');
+    const minutes = String(beijingTime.getUTCMinutes()).padStart(2, '0');
+    return `现在是北京时间 ${hours}:${minutes} 哦～`;
+  } else if (lowerContent.includes('谢谢') || lowerContent.includes('感谢')) {
+    return '不用客气！能帮到你我很开心～';
+  } else {
+    return `收到你的消息："${userContent}"～让我想想怎么回复你...有什么想聊的随时告诉我！`;
+  }
+}
+
+async function callZhipuAPI(prompt) {
+  try {
+    const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${AI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'glm-4-flash',
+        messages: [
+          {
+            role: 'system',
+            content: '你是一个友好的AI助手，名字叫AI助手。你的任务是帮助用户解决问题、聊天交流。请用自然、友好的中文回复用户。'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: 512,
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`API call failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      return data.choices[0].message.content.trim();
+    } else if (data.response) {
+      return data.response.trim();
+    } else {
+      throw new Error('Unexpected API response format');
+    }
+  } catch (error) {
+    console.error('Zhipu API error:', error);
+    return getSimpleResponse(prompt);
+  }
+}
 
 function promisifyDB(method) {
   return function(query, options = {}) {
@@ -420,6 +686,12 @@ app.post('/api/register', async (req, res) => {
       await addSelfAsFriend(userId);
     } catch (selfFriendError) {
       console.error('Add self as friend error:', selfFriendError);
+    }
+
+    try {
+      await addAIAgentAsFriend(userId, username, false);
+    } catch (aiFriendError) {
+      console.error('Add AI Agent as friend error:', aiFriendError);
     }
 
     res.json({ success: true, user: { id: userId, username, avatar: null, nickname: '' } });
@@ -943,6 +1215,10 @@ app.post('/api/send-message', async (req, res) => {
     }
 
     res.json({ success: true, message });
+
+    if (receiverId === AI_AGENT_ID && senderId !== AI_AGENT_ID) {
+      await handleAIMessage(senderId, content);
+    }
   } catch (error) {
     console.error('Send message error:', error);
     res.status(500).json({ success: false, message: '发送失败' });
@@ -1022,6 +1298,28 @@ app.post('/api/admin/verify', (req, res) => {
   } else {
     res.status(401).json({ success: false, message: '密码错误' });
   }
+});
+
+app.get('/api/admin/config/ai-key', (req, res) => {
+  const adminToken = req.headers['x-admin-token'];
+  if (!adminToken) {
+    return res.status(401).json({ success: false, message: '未授权' });
+  }
+  res.json({ success: true, apiKey: AI_API_KEY ? (AI_API_KEY.substring(0, 10) + '...') : '' });
+});
+
+app.post('/api/admin/config/ai-key', (req, res) => {
+  const adminToken = req.headers['x-admin-token'];
+  if (!adminToken) {
+    return res.status(401).json({ success: false, message: '未授权' });
+  }
+
+  const { apiKey } = req.body;
+  if (!apiKey) {
+    return res.status(400).json({ success: false, message: 'API Key不能为空' });
+  }
+  AI_API_KEY = apiKey;
+  res.json({ success: true });
 });
 
 app.post('/api/admin/change-password', async (req, res) => {
