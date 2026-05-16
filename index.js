@@ -502,9 +502,24 @@ async function sendAIIntroduction(userId) {
 }
 
 async function handleAIMessage(userId, userContent) {
-  if (!AI_AGENT_ID) return;
-
   try {
+    let aiId = AI_AGENT_ID;
+    if (!aiId) {
+      let aiUser;
+      if (DATABASE_URL) {
+        aiUser = await usersDB.query('SELECT id FROM users WHERE username = $1', [AI_AGENT_USERNAME]);
+      } else {
+        aiUser = await promisifyDB(usersDB.findOne).call(usersDB, { username: AI_AGENT_USERNAME });
+      }
+      const aiUserData = DATABASE_URL ? aiUser.rows[0] : aiUser;
+      if (aiUserData) {
+        aiId = aiUserData.id;
+        AI_AGENT_ID = aiId;
+      }
+    }
+
+    if (!aiId) return;
+
     let aiResponse = '';
 
     if (AI_API_KEY && AI_API_KEY.includes('.')) {
@@ -530,13 +545,13 @@ async function handleAIMessage(userId, userContent) {
       await messagesDB.query(
         `INSERT INTO messages (id, sender_id, receiver_id, content, type, time, timestamp, read)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [messageId, AI_AGENT_ID, userId, aiResponse, 'text', formattedTime, Date.now(), false]
+        [messageId, aiId, userId, aiResponse, 'text', formattedTime, Date.now(), false]
       );
     } else {
       await promisifyDB(messagesDB.insert).call(messagesDB, {
         _id: messageId,
         id: messageId,
-        sender_id: AI_AGENT_ID,
+        sender_id: aiId,
         receiver_id: userId,
         content: aiResponse,
         type: 'text',
@@ -550,7 +565,7 @@ async function handleAIMessage(userId, userContent) {
     if (targetSocketId) {
       io.to(targetSocketId).emit('new-message', {
         id: messageId,
-        sender_id: AI_AGENT_ID,
+        sender_id: aiId,
         sender_username: AI_AGENT_USERNAME,
         receiver_id: userId,
         content: aiResponse,
@@ -1230,8 +1245,17 @@ app.post('/api/send-message', async (req, res) => {
 
     res.json({ success: true, message });
 
-    if (receiverId === AI_AGENT_ID && senderId !== AI_AGENT_ID) {
-      await handleAIMessage(senderId, content);
+    if (senderId !== AI_AGENT_ID) {
+      let receiver;
+      if (DATABASE_URL) {
+        receiver = await usersDB.query('SELECT id FROM users WHERE id = $1 AND username = $2', [receiverId, AI_AGENT_USERNAME]);
+      } else {
+        receiver = await promisifyDB(usersDB.findOne).call(usersDB, { id: receiverId, username: AI_AGENT_USERNAME });
+      }
+      const receiverData = DATABASE_URL ? receiver.rows[0] : receiver;
+      if (receiverData) {
+        await handleAIMessage(senderId, content);
+      }
     }
   } catch (error) {
     console.error('Send message error:', error);
