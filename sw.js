@@ -13,7 +13,7 @@ const STATIC_ASSETS = [
   '/admin.js'
 ];
 
-const API_CACHE_NAME = 'tell-api-v5.9.43';
+const API_CACHE_NAME = 'tell-api-v5.9.44';
 const API_ROUTES = [
   '/api/user',
   '/api/friends',

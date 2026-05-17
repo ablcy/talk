@@ -1,4 +1,4 @@
-const APP_VERSION = typeof VERSION !== 'undefined' ? VERSION.full() : 'v5.9.43';
+const APP_VERSION = typeof VERSION !== 'undefined' ? VERSION.full() : 'v5.9.44';
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
@@ -75,25 +75,46 @@ class ChatApp {
             const saved = localStorage.getItem('notificationSettings');
             if (saved) {
                 const data = JSON.parse(saved);
-                this.notificationSettings = data;
+                this.notificationSettings = data.settings || {};
+                this.globalMessageNotification = data.globalMessageNotification !== false;
+                this.globalCallNotification = data.globalCallNotification !== false;
             } else {
                 this.notificationSettings = {};
+                this.globalMessageNotification = true;
+                this.globalCallNotification = true;
             }
         } catch {
             this.notificationSettings = {};
+            this.globalMessageNotification = true;
+            this.globalCallNotification = true;
         }
     }
 
     saveNotificationSettings() {
-        localStorage.setItem('notificationSettings', JSON.stringify(this.notificationSettings));
+        localStorage.setItem('notificationSettings', JSON.stringify({
+            settings: this.notificationSettings,
+            globalMessageNotification: this.globalMessageNotification,
+            globalCallNotification: this.globalCallNotification
+        }));
     }
 
     isNotificationEnabled(userId, isGroup = false) {
-        const key = isGroup ? `group_${userId}` : `friend_${userId}`;
+        if (isGroup) {
+            return true;
+        }
+        const key = `friend_${userId}`;
         if (this.notificationSettings[key] !== undefined) {
             return this.notificationSettings[key];
         }
         return true;
+    }
+
+    isGlobalMessageNotificationEnabled() {
+        return this.globalMessageNotification;
+    }
+
+    isGlobalCallNotificationEnabled() {
+        return this.globalCallNotification;
     }
 
     setNotificationEnabled(userId, enabled, isGroup = false) {
@@ -586,7 +607,9 @@ class ChatApp {
         }
 
         if (data.sender_username !== this.AI_AGENT_USERNAME && this.currentUser?.id === receiverId) {
-            this.playNotificationSound('message');
+            if (this.isGlobalMessageNotificationEnabled() && this.isNotificationEnabled(senderId, false)) {
+                this.playNotificationSound('message');
+            }
             const sender = this.friends.find(f => f.id === senderId);
             if (sender) {
                 this.showToast(`${sender.username}: ${data.content.substring(0, 30)}`);
@@ -651,7 +674,7 @@ class ChatApp {
 
         this.isInCall = true;
 
-        if (this.isNotificationEnabled(data.from, false)) {
+        if (this.isGlobalCallNotificationEnabled() && this.isNotificationEnabled(data.from, false)) {
             this.playCallRingtone();
         }
 
@@ -1686,6 +1709,10 @@ class ChatApp {
         });
 
         document.getElementById('logout-btn').addEventListener('click', () => this.logout());
+        document.getElementById('notification-settings-btn').addEventListener('click', () => this.showNotificationSettingsModal());
+        document.getElementById('close-notification-modal-btn').addEventListener('click', () => this.closeNotificationSettingsModal());
+        document.getElementById('global-message-notification-toggle').addEventListener('change', (e) => this.toggleGlobalMessageNotification(e.target.checked));
+        document.getElementById('global-call-notification-toggle').addEventListener('change', (e) => this.toggleGlobalCallNotification(e.target.checked));
         document.getElementById('share-app-btn').addEventListener('click', () => this.shareApp());
         document.getElementById('admin-panel-btn').addEventListener('click', () => window.location.href = '/admin');
 
@@ -3255,6 +3282,26 @@ class ChatApp {
             document.getElementById('auth-screen').style.display = 'flex';
             this.showLogin();
         }
+    }
+
+    showNotificationSettingsModal() {
+        document.getElementById('global-message-notification-toggle').checked = this.globalMessageNotification;
+        document.getElementById('global-call-notification-toggle').checked = this.globalCallNotification;
+        document.getElementById('notification-settings-modal').style.display = 'flex';
+    }
+
+    closeNotificationSettingsModal() {
+        document.getElementById('notification-settings-modal').style.display = 'none';
+    }
+
+    toggleGlobalMessageNotification(enabled) {
+        this.globalMessageNotification = enabled;
+        this.saveNotificationSettings();
+    }
+
+    toggleGlobalCallNotification(enabled) {
+        this.globalCallNotification = enabled;
+        this.saveNotificationSettings();
     }
 
     shareApp() {
