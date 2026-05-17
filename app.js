@@ -62,6 +62,7 @@ class ChatApp {
         this.isInCall = false;
         this.currentCallTarget = null;
         this.callRingInterval = null;
+        this.callAudioContext = null;
         
         this.loadBurnAfterReadingSetting();
         this.loadNotificationSettings();
@@ -595,8 +596,17 @@ class ChatApp {
     playCallRingtone() {
         this.stopCallRingtone();
         try {
+            if (!this.callAudioContext) {
+                this.callAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
             const playOnce = () => {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioContext = this.callAudioContext;
+
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
 
