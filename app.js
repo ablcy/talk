@@ -1,4 +1,4 @@
-const APP_VERSION = typeof VERSION !== 'undefined' ? VERSION.full() : 'v5.9.41';
+const APP_VERSION = typeof VERSION !== 'undefined' ? VERSION.full() : 'v5.9.42';
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
@@ -698,10 +698,9 @@ class ChatApp {
             // 获取本地媒体流（视频+音频）
             this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
-            // 确保音频上下文被激活
-            if (window.AudioContext || window.webkitAudioContext) {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                await audioContext.resume();
+            // 确保音频上下文被激活（复用已有的 callAudioContext）
+            if (this.callAudioContext && this.callAudioContext.state === 'suspended') {
+                await this.callAudioContext.resume();
             }
 
             // 添加本地流
