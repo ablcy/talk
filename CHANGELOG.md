@@ -1,5 +1,11 @@
 # 更新日志
 
+## ✨ v5.9.41 202605171709
+
+- 修复接听电话后铃声还在响的问题，在 acceptCall 方法中添加 stopCallRingtone 调用
+- 修复重新加载PWA时历史消息触发提示音的问题，添加 messagesLoaded 标志位区分首次加载和增量更新
+- 彻底更新所有硬编码版本号至 v5.9.41
+
 ## ✨ v5.9.40 202605171401
 
 - 修复接听电话后铃声还在响的问题，在 handleAnswer 中添加 try-catch 确保 stopCallRingtone 正确执行

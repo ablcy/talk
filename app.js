@@ -1,4 +1,4 @@
-const APP_VERSION = typeof VERSION !== 'undefined' ? VERSION.full() : 'v5.9.40';
+const APP_VERSION = typeof VERSION !== 'undefined' ? VERSION.full() : 'v5.9.41';
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
@@ -63,6 +63,7 @@ class ChatApp {
         this.currentCallTarget = null;
         this.callRingInterval = null;
         this.callAudioContext = null;
+        this.messagesLoaded = false;
         
         this.loadBurnAfterReadingSetting();
         this.loadNotificationSettings();
@@ -675,6 +676,11 @@ class ChatApp {
     }
     
     async acceptCall() {
+        try {
+            this.stopCallRingtone();
+        } catch (e) {
+            console.log('[App] Error stopping ringtone:', e);
+        }
         try {
             // 检查浏览器是否支持 mediaDevices
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -2676,7 +2682,7 @@ class ChatApp {
                 const oldCount = (this.messages[friend.id] || []).length;
                 this.messages[friend.id] = result.messages;
                 const newCount = result.messages.length;
-                if (newCount > oldCount && this.isNotificationEnabled(friend.id, false)) {
+                if (newCount > oldCount && this.isNotificationEnabled(friend.id, false) && this.messagesLoaded) {
                     const newMsgs = result.messages.slice(oldCount);
                     const hasNewFromOther = newMsgs.some(m => m.senderId !== this.currentUser.id);
                     if (hasNewFromOther) {
@@ -2685,6 +2691,10 @@ class ChatApp {
                     }
                 }
             }
+        }
+        
+        if (!this.messagesLoaded) {
+            this.messagesLoaded = true;
         }
 
         for (const group of this.groups) {
@@ -2696,7 +2706,7 @@ class ChatApp {
                 const oldCount = (this.groupMessages[group.id] || []).length;
                 this.groupMessages[group.id] = result.messages;
                 const newCount = result.messages.length;
-                if (newCount > oldCount && this.isNotificationEnabled(group.id, true)) {
+                if (newCount > oldCount && this.isNotificationEnabled(group.id, true) && this.messagesLoaded) {
                     const newMsgs = result.messages.slice(oldCount);
                     const hasNewFromOther = newMsgs.some(m => m.senderId !== this.currentUser.id);
                     if (hasNewFromOther) {

@@ -15,7 +15,7 @@
                 <img src="logo.jpg" alt="Tell Logo" class="password-logo">
                 <h1>Tell Admin</h1>
                 <p>请输入管理员密码</p>
-                <span class="login-version" id="admin-login-version">v5.9.40</span>
+                <span class="login-version" id="admin-login-version">v5.9.41</span>
             </div>
             
             <form id="password-form">
@@ -40,7 +40,7 @@
                 </div>
                 <div class="header-right">
                     <button id="change-pwd-btn" class="btn btn-secondary">修改密码</button>
-                    <span class="version-badge" id="admin-header-version">v5.9.40</span>
+                    <span class="version-badge" id="admin-header-version">v5.9.41</span>
                     <a href="/" class="back-link">← 返回应用</a>
                 </div>
             </div>
@@ -149,20 +149,24 @@
                 <div class="logs-container" id="logs-container">
                     <div class="log-entry">
                         <span class="log-time">[系统]</span>
-                        <span class="log-message" id="admin-log-message">Tell Admin v5.9.40 启动成功</span>
+                        <span class="log-message" id="admin-log-message">Tell Admin v5.9.41 启动成功</span>
                     </div>
                 </div>
             </section>
 
             <section class="changelog-section">
                 <div class="section-header changelog-header">
-                    <h2 id="admin-changelog-header">📝 更新日志 v5.9.40 202605171401</h2>
+                    <h2 id="admin-changelog-header">📝 更新日志 v5.9.41 202605171709</h2>
                     <button id="toggle-changelog-btn" class="btn btn-secondary">▼ 展开</button>
                 </div>
                 <div class="changelog-content" id="changelog-content" style="display: none;">
+                    <div class="update-item">✨ v5.9.41 202605171709: 修复接听电话后铃声还在响的问题（在acceptCall方法中添加stopCallRingtone）；修复重新加载PWA时历史消息触发提示音的问题（添加messagesLoaded标志位）；更新所有硬编码版本号至v5.9.41</div>
                     <div class="update-item">✨ v5.9.40 202605171401: 修复接听电话后铃声还在响的问题；修复对方挂断电话后拨打方没有退出视频框并提醒的问题；更新所有硬编码版本号至v5.9.40</div>
-                    <div class="update-item">✨ v5.9.39 202605171401: 修复视频通话来电铃声仍然只响一次的问题，改用持久的 AudioContext 实例</div>
-                    <div class="update-item">✨ v5.9.35 202605151533: 修复版本号显示问题，更新所有硬编码版本号至v5.9.35，确保前端、后台管理、更新日志等所有位置版本号同步</div>
+                    <div class="update-item">✨ v5.9.39 202605171401: 修复视频通话来电铃声仍然只响一次的问题，改用持久的 AudioContext 实例，添加状态检查和resume()恢复播放</div>
+                    <div class="update-item">✨ v5.9.38 202605170157: 修复视频通话来电铃声只响一次的问题，改为循环播放直到接通或挂断</div>
+                    <div class="update-item">✨ v5.9.37 202605170157: 修复AI智能体账号问题，将硬编码的AI_AGENT_USERNAME从'AI助手'改为'AI'</div>
+                    <div class="update-item">✨ v5.9.36 202605170157: 修复个人界面修改账号的限制，从至少3个字符改为仅需1个字符</div>
+                    <div class="update-item">✨ v5.9.35 202605151533: 修复版本号显示问题，更新所有硬编码版本号至v5.9.35</div>
                     <div class="update-item">✨ v5.9.34 202605170730: 修复所有消息的实时推送和自动滚动问题，后端发送消息后通过Socket.IO实时推送消息给接收者，前端统一处理所有消息的实时接收和显示，无论是AI还是好友发消息，都能即时显示并自动滚动到底部，添加消息去重逻辑避免重复显示消息</div>
                     <div class="update-item">✨ v5.9.33 202605170630: 修复AI消息实时推送的判断逻辑问题，通过用户名判断是否是发送给AI助手的消息，修复AI_AGENT_ID未初始化导致的消息处理失败问题</div>
                     <div class="update-item">✨ v5.9.32 202605170530: 修复AI消息自动滚动到底部问题，确保收到消息时聊天框自动滚动</div>
