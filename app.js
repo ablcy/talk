@@ -61,6 +61,7 @@ class ChatApp {
         this.remoteStream = null;
         this.isInCall = false;
         this.currentCallTarget = null;
+        this.callRingInterval = null;
         
         this.loadBurnAfterReadingSetting();
         this.loadNotificationSettings();
@@ -591,6 +592,40 @@ class ChatApp {
         }
     }
 
+    playCallRingtone() {
+        this.stopCallRingtone();
+        try {
+            const playOnce = () => {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+                oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.4);
+            };
+            playOnce();
+            this.callRingInterval = setInterval(playOnce, 1500);
+        } catch (e) {
+            console.log('[App] Cannot play call ringtone:', e);
+        }
+    }
+
+    stopCallRingtone() {
+        if (this.callRingInterval) {
+            clearInterval(this.callRingInterval);
+            this.callRingInterval = null;
+        }
+    }
+
     handleIncomingCall(data) {
         if (this.isInCall) {
             this.socket.emit('call-reject', { targetId: data.from });
@@ -606,7 +641,7 @@ class ChatApp {
         this.isInCall = true;
 
         if (this.isNotificationEnabled(data.from, false)) {
-            this.playNotificationSound('call');
+            this.playCallRingtone();
         }
 
         // 显示来电界面
@@ -693,11 +728,13 @@ class ChatApp {
     }
     
     rejectCall() {
+        this.stopCallRingtone();
         this.socket.emit('call-reject', { targetId: this.currentCallTarget.id });
         this.endCall();
     }
     
     handleAnswer(data) {
+        this.stopCallRingtone();
         this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
         this.updateCallModal('connected');
     }
@@ -718,6 +755,7 @@ class ChatApp {
     }
     
     endCall() {
+        this.stopCallRingtone();
         this.isInCall = false;
         this.remoteStreamPlaying = false;
         this.isVideoPlaying = false;
