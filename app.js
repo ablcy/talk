@@ -1709,8 +1709,7 @@ class ChatApp {
                 
                 if (!result.success) {
                     this.stopPasswordVersionCheck();
-                    this.logout();
-                    alert('密码已被修改，请重新登录');
+                    this.logout(true);
                 }
             } catch (error) {
                 // 忽略网络错误
@@ -3274,8 +3273,8 @@ class ChatApp {
         }
     }
 
-    logout() {
-        if (confirm('确定要退出登录吗？')) {
+    logout(force = false) {
+        if (force || confirm('确定要退出登录吗？')) {
             this.stopPolling();
             this.stopPasswordVersionCheck();
             localStorage.removeItem('currentUser');
